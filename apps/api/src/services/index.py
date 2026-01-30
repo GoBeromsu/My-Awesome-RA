@@ -21,7 +21,7 @@ class IndexService:
 
         self.chunk_size = int(os.getenv("CHUNK_SIZE", "500"))
         self.chunk_overlap = int(os.getenv("CHUNK_OVERLAP", "100"))
-        self.dimension = 4096  # SOLAR embedding dimension
+        self.dimension = 1024  # SOLAR embedding dimension (solar-embedding-1-large)
 
         self._index: faiss.IndexFlatIP | None = None
         self._metadata: list[dict[str, Any]] = []
@@ -86,7 +86,11 @@ class IndexService:
         return chunks
 
     async def index_document(
-        self, document_id: str, content: str, metadata: dict[str, Any] | None = None
+        self,
+        document_id: str,
+        content: str,
+        metadata: dict[str, Any] | None = None,
+        grounding: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
         Index a document by chunking and embedding.
@@ -95,6 +99,7 @@ class IndexService:
             document_id: Unique document identifier.
             content: Document text content.
             metadata: Optional metadata to store with chunks.
+            grounding: Optional grounding info from SOLAR (page/bbox per element).
 
         Returns:
             Indexing result with chunk count.
@@ -110,6 +115,9 @@ class IndexService:
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
             chunk_id = f"{document_id}_{i}"
 
+            # Find grounding info for this chunk
+            chunk_grounding = self._find_grounding_for_chunk(chunk, grounding)
+
             # Normalize for cosine similarity
             normalized = embedding / np.linalg.norm(embedding)
             self._index.add(normalized.reshape(1, -1))
@@ -120,6 +128,8 @@ class IndexService:
                 "text": chunk["text"],
                 "start_idx": chunk["start_idx"],
                 "end_idx": chunk["end_idx"],
+                "page": chunk_grounding.get("page", 1),
+                "bbox": chunk_grounding.get("box"),
                 **(metadata or {}),
             })
 
@@ -129,6 +139,55 @@ class IndexService:
             "document_id": document_id,
             "chunk_count": len(chunks),
         }
+
+    def _find_grounding_for_chunk(
+        self, chunk: dict[str, Any], grounding: dict[str, Any] | None
+    ) -> dict[str, Any]:
+        """
+        Find the grounding info (page, bbox) for a text chunk.
+
+        For MVP, we estimate based on chunk position within the document.
+        SOLAR grounding maps element_ids to page/box, but we don't have
+        direct element_id to text mapping, so we use position heuristics.
+
+        Args:
+            chunk: Chunk dict with start_idx, end_idx, text.
+            grounding: SOLAR grounding dict mapping element_id to page/box.
+
+        Returns:
+            Dict with 'page' and optionally 'box' keys.
+        """
+        if not grounding:
+            return {"page": 1}
+
+        # For MVP: estimate page from position
+        # Get total pages from grounding info
+        pages = set()
+        for element_id, info in grounding.items():
+            if isinstance(info, dict) and "page" in info:
+                pages.add(info["page"])
+
+        total_pages = max(pages) if pages else 1
+
+        # Simple heuristic: map chunk position to page number
+        # This is a rough approximation - for better accuracy,
+        # we'd need to parse HTML and map text spans to element_ids
+        if total_pages == 1:
+            return {"page": 1}
+
+        # Get all grounding entries sorted by page
+        sorted_entries = sorted(
+            [(k, v) for k, v in grounding.items() if isinstance(v, dict) and "page" in v],
+            key=lambda x: x[1].get("page", 1),
+        )
+
+        if not sorted_entries:
+            return {"page": 1}
+
+        # Estimate based on chunk text position
+        # For now, return first page as default
+        # TODO: Implement more sophisticated text-to-element matching
+        return {"page": sorted_entries[0][1].get("page", 1)}
 
     async def search(
         self,
