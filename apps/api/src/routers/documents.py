@@ -2,11 +2,14 @@
 
 import hashlib
 import logging
+import os
 import re
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 
 from src.dependencies import get_index_service, get_solar_service
 from src.models.document import (
@@ -30,6 +33,8 @@ router = APIRouter()
 # Configuration
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
 DOCUMENT_ID_PATTERN = re.compile(r"^[\w\-\.]+_[a-f0-9]{12}$")
+PDF_STORAGE_PATH = Path(os.getenv("PDF_STORAGE_PATH", "data/pdfs"))
+PDF_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
 
 # In-memory storage for document processing status
 # In production, use Redis or database
@@ -101,7 +106,11 @@ async def parse_document(
             metadata=result.get("metadata", {}),
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.exception(f"Error parsing document: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to parse document. Please try again later.",
+        ) from e
 
 
 @router.post("/index", response_model=DocumentIndexResponse)
@@ -132,7 +141,11 @@ async def index_document(
             status="indexed",
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.exception(f"Error indexing document: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to index document. Please try again later.",
+        ) from e
 
 
 @router.get("/{document_id}/chunks", response_model=DocumentChunksResponse)
@@ -159,7 +172,11 @@ async def get_document_chunks(
             total=len(chunks),
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.exception(f"Error getting document chunks: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to retrieve document chunks. Please try again later.",
+        ) from e
 
 
 @router.delete("/{document_id}", response_model=DocumentDeleteResponse)
@@ -167,7 +184,6 @@ async def delete_document(
     document_id: str,
     index_service: Annotated[IndexService, Depends(get_index_service)],
 ) -> DocumentDeleteResponse:
-    validate_document_id(document_id)
     """
     Delete a document and all its chunks from the index.
 
@@ -178,6 +194,7 @@ async def delete_document(
     Returns:
         Deletion result with chunk count.
     """
+    validate_document_id(document_id)
     try:
         chunks_deleted = index_service.delete_document(document_id)
 
@@ -188,6 +205,11 @@ async def delete_document(
         if document_id in _document_status:
             del _document_status[document_id]
 
+        # Clean up PDF file
+        pdf_path = PDF_STORAGE_PATH / f"{document_id}.pdf"
+        if pdf_path.exists():
+            pdf_path.unlink()
+
         return DocumentDeleteResponse(
             document_id=document_id,
             chunks_deleted=chunks_deleted,
@@ -196,7 +218,41 @@ async def delete_document(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.exception(f"Error deleting document: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to delete document. Please try again later.",
+        ) from e
+
+
+@router.get("/{document_id}/file")
+async def get_document_file(document_id: str) -> FileResponse:
+    """
+    Serve the original PDF file.
+
+    Browser can open with #page=N to jump to a specific page.
+
+    Args:
+        document_id: Document identifier.
+
+    Returns:
+        PDF file response.
+    """
+    validate_document_id(document_id)
+    pdf_path = (PDF_STORAGE_PATH / f"{document_id}.pdf").resolve()
+
+    # Defense in depth: ensure path is within storage directory
+    if not pdf_path.is_relative_to(PDF_STORAGE_PATH.resolve()):
+        raise HTTPException(status_code=400, detail="Invalid document path")
+
+    if not pdf_path.exists():
+        raise HTTPException(status_code=404, detail="PDF file not found")
+
+    return FileResponse(
+        path=pdf_path,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "inline"},
+    )
 
 
 async def _process_document_in_background(
@@ -211,15 +267,21 @@ async def _process_document_in_background(
         logger.info(f"Starting background processing for {document_id}")
         _document_status[document_id] = {
             "status": "processing",
-            "message": "Parsing PDF...",
+            "message": "Saving PDF...",
         }
+
+        # Save PDF file for later retrieval
+        pdf_path = PDF_STORAGE_PATH / f"{document_id}.pdf"
+        pdf_path.write_bytes(content)
+
+        _document_status[document_id]["message"] = "Parsing PDF..."
 
         # Parse PDF
         parsed = await solar_service.parse_document(content, filename)
 
         _document_status[document_id]["message"] = "Indexing content..."
 
-        # Index with metadata
+        # Index with metadata and grounding info
         result = await index_service.index_document(
             document_id=document_id,
             content=parsed["content"],
@@ -230,6 +292,7 @@ async def _process_document_in_background(
                 "indexed_at": datetime.now(timezone.utc).isoformat(),
                 **parsed.get("metadata", {}),
             },
+            grounding=parsed.get("grounding"),
         )
 
         _document_status[document_id] = {
@@ -354,7 +417,86 @@ async def upload_and_index_document(
             message="Document queued for processing",
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.exception(f"Error uploading document: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to upload document. Please try again later.",
+        ) from e
+
+
+@router.post("/{document_id}/reindex", response_model=DocumentUploadResponse)
+async def reindex_document(
+    document_id: str,
+    background_tasks: BackgroundTasks,
+    solar_service: Annotated[SolarService, Depends(get_solar_service)],
+    index_service: Annotated[IndexService, Depends(get_index_service)],
+) -> DocumentUploadResponse:
+    """
+    Re-parse and re-index an existing PDF document.
+
+    This endpoint:
+    1. Validates the document exists
+    2. Deletes existing index entries
+    3. Re-parses and re-indexes in background
+
+    Poll GET /documents/{id}/status to check processing status.
+
+    Args:
+        document_id: Document identifier.
+        background_tasks: FastAPI background tasks.
+        solar_service: Shared SolarService instance.
+        index_service: Shared IndexService instance.
+
+    Returns:
+        Document ID and processing status.
+    """
+    validate_document_id(document_id)
+    pdf_path = PDF_STORAGE_PATH / f"{document_id}.pdf"
+
+    if not pdf_path.exists():
+        raise HTTPException(status_code=404, detail="PDF file not found")
+
+    try:
+        # Delete existing index entries
+        index_service.delete_document(document_id)
+
+        # Clear any existing status
+        if document_id in _document_status:
+            del _document_status[document_id]
+
+        # Read PDF content
+        content = pdf_path.read_bytes()
+        filename = f"{document_id}.pdf"
+
+        # Initialize status
+        _document_status[document_id] = {
+            "status": "processing",
+            "message": "Queued for reindexing",
+        }
+
+        # Add background task for reindexing
+        background_tasks.add_task(
+            _process_document_in_background,
+            document_id,
+            content,
+            filename,
+            solar_service,
+            index_service,
+        )
+
+        return DocumentUploadResponse(
+            document_id=document_id,
+            status="processing",
+            message="Reindexing started",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error reindexing document: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to reindex document. Please try again later.",
+        ) from e
 
 
 @router.post("/upload/sync", response_model=DocumentIndexResponse)
@@ -396,10 +538,14 @@ async def upload_and_index_document_sync(
         safe_name = re.sub(r"[^\w\-\.]", "_", file.filename.rsplit(".", 1)[0])
         document_id = f"{safe_name}_{file_hash}"
 
+        # Save PDF file for later retrieval
+        pdf_path = PDF_STORAGE_PATH / f"{document_id}.pdf"
+        pdf_path.write_bytes(content)
+
         # Parse PDF
         parsed = await solar_service.parse_document(content, file.filename)
 
-        # Index with metadata
+        # Index with metadata and grounding info
         result = await index_service.index_document(
             document_id=document_id,
             content=parsed["content"],
@@ -410,6 +556,7 @@ async def upload_and_index_document_sync(
                 "indexed_at": datetime.now(timezone.utc).isoformat(),
                 **parsed.get("metadata", {}),
             },
+            grounding=parsed.get("grounding"),
         )
 
         # Update status
@@ -425,4 +572,8 @@ async def upload_and_index_document_sync(
             status="indexed",
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.exception(f"Error in synchronous upload: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to process document. Please try again later.",
+        ) from e
