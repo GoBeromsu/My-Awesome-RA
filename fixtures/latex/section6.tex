@@ -1,0 +1,24 @@
+\section{Related work}
+\label{sc:related-work}
+\subsection{Commit-Related Tasks}
+
+Commit-level research is commonly grouped into three areas: \emph{generation}, \emph{classification}, and \emph{refinement}.
+Generation tasks include commit message generation (CMG), code change summarization, code review generation (CRG), and just-in-time comment updates (JITCU). 
+Classification typically targets the recovery of semantic intent, often via CCS types. 
+Refinement leverages commit context for code improvement and defect prediction.
+Comparative studies report that LLMs achieve strong performance across CMG, CRG, and JITCU under in-context learning (ICL) and PEFT, albeit with substantial computational and latency costs \citep{Fan2024Exploring}.
+Fine-tuned SLMs trained on high-quality data demonstrate competitive performance and offer a cost-efficient alternative \citep{Li2024Understanding}.
+Code-change-oriented pretraining further improves generation quality.
+For example, CCT5, pre-trained on \emph{CodeChangeNet} (1.5M commit–message pairs), consistently outperforms earlier approaches \citep{Lin2023CCT5}.
+Refinement tasks extend these gains by exploiting commit context for automated refactoring and just-in-time defect prediction \citep{Li2024Understanding, Lin2023CCT5}.
+However, most CCS-based classification assumes a single dominant intent per commit, leaving multi-intent (tangled) commits underexplored and motivating our multi-label formulation.
+
+\subsection{Optimizing SLMs for Code-level Tasks}
+Although our methodology achieves strong baseline performance using a curated dataset and CoT prompting, its capabilities can be further enhanced by incorporating techniques from recent SLM research.
+To mitigate the limitation that language models often identify what changed but fail to infer why, Retrieval-Augmented Generation (RAG) can supply explicit, relevant examples during inference \citep{Li2024Understanding}.
+More sophisticated prompt-engineering strategies also offer promising directions for improving reasoning on complex code changes \citep{Hou2024Large}.
+Recent studies further suggest that SLM reasoning ability can be enhanced through distillation.
+Although CoT prompting elicits reasoning in LLMs, such capabilities typically emerge only in very large models.
+\citet{Ranaldi2024Aligning} show that instruction-tuned student models trained on a small number of high-quality distilled CoT demonstrations can recover much of this reasoning ability at smaller scales.
+In particular, CoT-based demonstrations are most effective for reasoning alignment, especially when derived from in-family teacher models.
+These findings indicate that SLMs, despite their parameter constraints, can acquire multi-step reasoning skills through carefully curated distillation rather than prompting alone.

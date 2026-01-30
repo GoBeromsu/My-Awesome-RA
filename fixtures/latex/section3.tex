@@ -1,0 +1,146 @@
+\section{Methodology}
+\label{sc:methodology}
+
+This section outlines the methodology used in this study.
+We first refine the CCS labels to remove ambiguity and then construct a tangled commit dataset for evaluation.
+In our experiments, each model receives a tangled commit as input and predicts a set of CCS labels representing its semantic concerns.
+
+\subsection{CCS Refinement}
+\label{sc:met:ccs}
+We use CCS types because the CCS taxonomy provides an explicit mapping from a developer’s underlying intent to the semantic concerns reflected in the resulting code changes.
+While the intent describes why a modification was made, the corresponding concern captures how that intent materializes within the codebase.
+
+As described in Section~\ref{sc:bg:ccs}, the original CCS taxonomy exhibits category overlap and semantic ambiguity.
+We address this issue by consolidating overlapping categories, removing types that prior studies identified as difficult to distinguish reliably, and aligning the final definitions with established refinements~\citep{Zeng2025First,Li2024Understanding}.
+This process excludes \texttt{perf}, \texttt{style}, and \texttt{chore}, and yields seven CCS types—\texttt{feat}, \texttt{fix}, \texttt{refactor}, \texttt{docs}, \texttt{test}, \texttt{build}, and \texttt{ci}—which serve as the label set used throughout dataset construction, model training, and evaluation.
+
+\subsection{Tangled Commit Dataset}
+\label{sc:met:dc}
+There is no publicly available dataset of tangled commits annotated with CCS types. 
+Existing CCS datasets~\citep{Zeng2025First} contain only atomic commits, each representing a single CCS-style commit message that consists of a type, a description, and an associated code diff
+However, even commits labeled as atomic may encode multiple semantic concerns, making them unsuitable as ground truth for multi-concern detection.
+
+To obtain a reliable source of truly single-concern units, we retrieved the manually annotated CCS-labeled dataset released by \citet{Zeng2025First} and applied our refined CCS taxonomy to re-assess the atomicity of each commit.
+During this step, we removed commits whose messages or diffs indicated multiple CCS types or mixed purposes, yielding a cleaned pool of commits that each contain exactly one CCS type, one commit message, and one code diff.
+This verified atomic pool serves as the compositional basis for synthesizing tangled commits used in both training and evaluation.
+
+\begin{algorithm}
+\SetKwInOut{Input}{Input}
+\SetKwInOut{Output}{Output}
+
+\Input{CCS-labeled Commit Dataset $\mathcal{R}$, \\
+       Refined Label Set $\mathcal{T}$, \\
+       Per-class Target Count $q$, \\
+       Token-length Limit $l_\text{lim}$}
+\Output{Atomic Pool $\mathcal{A}$ grouped by labels in $\mathcal{T}$}
+
+\ForEach{label $t \in \mathcal{T}$}{
+    Atomic subpool $\mathcal{A}_t \gets \emptyset$\\
+    $\mathcal{R}_t \gets$ commits in $\mathcal{R}$ with label $t$\\
+    \While{$|\mathcal{A}_t| < q$}{
+        Candidate commit $a \gets \textsc{RandomSample}(\mathcal{R}_t)$\\
+        $\mathcal{R}_t \gets \textsc{RemoveDuplicateCommits}(\mathcal{R}_t, \mathcal{A}_t)$\\
+        $\mathcal{R}_t \gets \textsc{FilterByTokenLength}(\mathcal{R}_t, l_\text{lim})$\\
+        $\mathcal{A}_t \gets \mathcal{A}_t \cup \textsc{FilterByAtomicity}(a)$\\
+    }
+}
+\textbf{return} $\mathcal{A} \gets \{\mathcal{A}_t : t \in \mathcal{T}\}$
+\caption{Atomic Commit Sampling}
+\label{alg:atomic_sampling}
+\end{algorithm}
+
+We constructed the atomic pool using the refined CCS types defined in Section~\ref{sc:met:ccs}. 
+Algorithm~\ref{alg:atomic_sampling} iterates over each type $t \in \mathcal{T}$ and collects commits labeled with $t$ into a type-specific subpool $\mathcal{A}_t$.
+For each candidate commit, the algorithm performs three validation steps.  
+(1) It samples a candidate commit $a$ from $\mathcal{R}_t$ (line 5).  
+(2) It filters $\mathcal{R}_t$ to remove duplicates already present in $\mathcal{A}t$ and to exclude commits whose combined CCS description and code diff exceed the token-length limit $l_\text{lim}$ (lines 6–7), ensuring that future candidates are unique and remain within the length budget.
+(3) It applies \textsc{FilterByAtomicity} to ensure that $a$ contains exactly one refined CCS type and a single coherent description–diff pair (line 8).  
+Valid commits are added to $\mathcal{A}_t$, and invalid candidates are discarded.
+ 
+Sampling continues until each type-specific pool reaches the target quota $q$, resulting in a balanced atomic pool with $|\mathcal{A}| = |\mathcal{T}| \cdot q$ verified commits across the refined CCS types.
+We then split the resulting atomic pool into training and evaluation subsets using an 8:2 ratio to prevent data leakage.
+Each subset serves as the input source for constructing the corresponding synthetic tangled dataset in Algorithm~\ref{alg:tangled_generation}.
+
+\begin{algorithm}
+\SetKwInOut{Input}{Input}
+\SetKwInOut{Output}{Output}
+
+\Input{Atomic Pool $\mathcal{A}$ grouped by labels $\mathcal{T}$, \\
+       Concern Counts $\mathcal{N}$, \\
+       Per-count Quota $q$, \\
+       Token-length Limit $l_\text{lim}$}
+\Output{Tangled Commit Dataset $\mathcal{D}$}
+
+$\mathcal{D} \gets \emptyset$\\
+\ForEach{Concern Count $n \in \mathcal{N}$}{
+    \While{Number of samples for count $n$ in $\mathcal{D}$ $<$ $q$}{
+        Selected Label Set $T \gets \textsc{SelectDistinctLabels}(\mathcal{T}, n)$\\
+        Atomic Commits $C \gets \{\textsc{RandomSample}(\mathcal{A}, t) : t \in T\}$\\
+        Candidate commit $x \gets \textsc{ConstructTangledCommit}(C)$\\
+        $x \gets \textsc{RemoveDuplicateCommits}(x, \mathcal{D})$\\
+        $x \gets \textsc{FilterByTokenLength}(x, l_\text{lim})$\\
+        \If{$x \neq \emptyset$}{
+           $\mathcal{D} \gets \mathcal{D} \cup \{x\}$\\
+        }
+    }
+}
+\textbf{return} $\mathcal{D}$
+\caption{Synthetic Tangled Commit Generation}
+\label{alg:tangled_generation}
+\end{algorithm}
+
+Synthetic tangled commits were generated from the verified atomic pool, as formalized in Algorithm~\ref{alg:tangled_generation}. 
+Each atomic commit provides a single CCS type, one CCS description, and one code diff, allowing it to function as an independent compositional unit.
+For a target concern count $n \in \{1,\dots,5\}$, the algorithm samples $n$ atomic commits with distinct CCS types and constructs a tangled commit by merging their CCS descriptions and concatenating their code diffs. 
+The resulting commit therefore contains a multi-label type set of size $n$, a combined CCS description, and an aggregated diff.
+To maintain balanced coverage across concern levels, we set a per-count quota of $q = 350$, yielding $5 \times 350 = 1750$ tangled commits. 
+Candidate samples exceeding the token-length limit or duplicating existing instances were discarded (i.e., represented as $\emptyset$), and sampling continued until all concern levels reached the target quota.
+
+Figure~\ref{fig:token_length_by_concern} presents the token-length distribution of the evaluation subset across concern counts.
+Token length is measured as the combined number of tokens in the commit message and the associated code diffs.
+As concern count increases, the distribution naturally shifts toward longer inputs because higher-count tangled commits aggregate multiple atomic changes in an approximately additive manner.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.75\linewidth]{boxplot_concern_count_token_length.png}
+    \caption{Token-length distribution across concern counts in the evaluation tangled dataset.}
+    \label{fig:token_length_by_concern}
+\end{figure}
+
+The resulting synthetic tangled dataset serves as the foundation for all subsequent stages of this study, providing the training subset used for model fine-tuning in Section~\ref{sc:met:model} and the evaluation subset used for performance assessment under the empirical setup described in Section~\ref{sc:evaluation}.
+
+\subsection{Model Configuration}
+\label{sc:met:model}
+
+We select SLMs based on three task-aligned criteria: code awareness, context capacity, and reproducibility.
+We restrict our choices to decoder-only Transformer architectures, as prior work shows that they provide strong performance and practical deployability for code-related tasks \citep{Lu2025Small}.
+We further require that candidate SLMs be open and locally deployable, so that experiments remain reproducible and computationally efficient.
+The context window must be large enough to contain the entire model input—both the prompt described in Section~\ref{sc:met:pd} and the tangled commit, whose token-length distribution is shown in Figure~\ref{fig:token_length_by_concern}.
+
+We fine-tune the selected SLM using LoRA within the \texttt{Transformers} framework to specialize the model for our task.
+The LoRA adapters are trained on the dataset introduced in Section~\ref{sc:met:dc}.
+Inference is performed locally using the \texttt{llama.cpp} backend~\citep{llama_cpp_docs}, with fixed random seeds and deterministic decoding to ensure reproducible outputs.
+
+\subsection{Prompt Design}
+\label{sc:met:pd}
+We designed a structured prompt that defines the model’s role as a software engineer performing CCS concern classification.
+It provides concise label definitions, deterministic decision rules, and minimal task context, as summarized in Figure~\ref{fig:prompt-template}.
+The \texttt{<ccs\_types>} section adopts the refined types described in Section~\ref{sc:met:ccs}, ensuring consistent and unambiguous label usage across all experiments.
+The \texttt{<labeling\_instructions>} section builds upon the \emph{purpose} and \emph{object} concepts introduced in Section~\ref{sc:bg:ccs}, extending the initial priority rule into a conditional scheme that explicitly resolves label overlap:
+
+\begin{enumerate}[1.]
+    \item \textbf{Purpose–Purpose:} select the label that best reflects \emph{why} the change was made.
+    \item \textbf{Object–Object:} select the label that reflects the \emph{functional role} of the modified artefact.
+    \item \textbf{Purpose–Object:} apply purpose labels only when the change affects application behaviour or structure.
+\end{enumerate}
+
+\begin{figure}
+    \centering
+    \fbox{\includegraphics[width=0.75\linewidth]{Prompt_template.png}}
+    \caption{Simplified structure of the prompt template used in the experiment.}
+    \label{fig:prompt-template}
+\end{figure}
+The prompt separates \emph{purpose} (\texttt{feat}, \texttt{fix}, \texttt{refactor}) from \emph{object} (\texttt{docs}, \texttt{test}, \texttt{build}, \texttt{ci}) and encodes these rules explicitly to ensure consistency in overlapping cases. 
+Purpose labels are applied only when the modification alters behavior or structure; otherwise, the corresponding object label is used (e.g., editing comments in code is labeled as \texttt{docs}, not \texttt{refactor} or \texttt{fix}).
+The input section comprises a \texttt{<commit\_message>} and \texttt{<tangled\_code\_diffs>}, both derived from the dataset described in Section~\ref{sc:met:dc}. 
+Each tangled sample merges multiple atomic commit messages and their corresponding code diffs, which are subsequently varied during evaluation (Section~\ref{sec:exp:setup}) to examine the effects of message inclusion and token-budget-constrained diff truncation.

@@ -1,0 +1,106 @@
+%&pdflatex
+
+\RequirePackage{fix-cm}
+\documentclass{svjour3}                     %
+
+\smartqed  %
+
+\usepackage{graphicx}
+\usepackage{multirow}
+\usepackage{paralist}
+\usepackage{hyperref}
+\usepackage[numbers]{natbib}
+
+\usepackage{orcidlink} 
+\usepackage{amsmath}
+\DeclareMathOperator*{\argmax}{argmax}
+\usepackage{siunitx}
+
+\usepackage[linesnumbered, ruled, vlined]{algorithm2e}
+\SetAlFnt{\small}
+\SetAlCapFnt{\small}
+\SetAlCapNameFnt{\small}
+\SetKwRepeat{Do}{do}{while}
+\usepackage{setspace} 
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{subcaption}
+\usepackage{tcolorbox}
+\begin{document}
+
+\title{Detecting Multiple Semantic Concerns in Tangled Code Commits%
+}
+
+
+\author{
+Beomsu Koh\orcidlink{0009-0004-2742-2200}
+\and
+Neil Walkinshaw\orcidlink{0000-0003-2134-6548}
+\and
+Donghwan Shin\orcidlink{0000-0002-0840-6449}
+}
+
+
+\institute{
+Beomsu Koh \at
+Department of Computer Science, University of Sheffield, Sheffield, United Kingdom \\
+\email{gobeumsu@gmail.com}
+\and
+Neil Walkinshaw \at
+Department of Computer Science, University of Sheffield, Sheffield, United Kingdom \\
+\email{n.walkinshaw@sheffield.ac.uk}
+\and
+Donghwan Shin \at
+Department of Computer Science, University of Sheffield, Sheffield, United Kingdom \\
+\email{d.shin@sheffield.ac.uk}
+}
+
+
+\date{Received: date / Accepted: date}
+
+\maketitle
+\input{abstract}
+\input{section1}
+\input{section2}
+\input{section3}
+\input{section4}
+\input{section5}
+\input{section6}
+\input{section7}
+
+
+
+
+
+
+\section*{Declarations}
+
+\subsection*{Funding}
+The authors did not receive support from any organization for the submitted work.
+
+\subsection*{Ethical Approval}
+Not applicable.
+
+\subsection*{Informed Consent}
+Not applicable.
+
+\subsection*{Author Contributions}
+Beomsu Koh: Conceptualization, Methodology, Software, Formal analysis, Writing -- original draft.\\
+Neil Walkinshaw: Supervision, Writing -- review \& editing.\\
+Donghwan Shin: Supervision, Writing -- review \& editing.
+
+\subsection*{Data Availability Statement}
+All artefacts produced in this study, including the tangled commit dataset, fine-tuned models, and supporting scripts, have been made publicly available. See Section~\ref{sec:data-availability} for details.
+
+\subsection*{Conflict of Interest}
+The authors have no conflicts of interest to declare that are relevant to the content of this article.
+
+\subsection*{Clinical Trial Number}
+Not applicable.
+
+
+\bibliographystyle{spbasic}      %
+\bibliography{references} 
+
+
+\end{document}

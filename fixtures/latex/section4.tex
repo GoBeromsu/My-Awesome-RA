@@ -1,0 +1,326 @@
+\section{Evaluation}
+\label{sc:evaluation}
+
+We aim to investigate whether SLMs can provide a practical and cost-effective alternative to LLMs for multi-label semantic concern detection by answering the four research questions discussed in Section~\ref{sec:intro}.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{EMSE_workflow.png}
+    \caption{Evaluation Overview}
+    \label{fig:rq-workflow}
+\end{figure}
+
+Figure~\ref{fig:rq-workflow} summarizes the empirical evaluation workflow, linking the datasets, model inputs, and research questions.
+Based on the tangled commit dataset constructed in Section~\ref{sc:methodology}, we evaluate three configurations—GPT-4.1, Qwen3-14B (base), and Qwen3-14B (LoRA-fine-tuned)—on the multi-label concern detection task. 
+For each research question, we construct the corresponding model input by combining the prompt with either a full or truncated diff.
+Commit messages are included by default in RQ1 and RQ3, compared between inclusion and exclusion in RQ2, and included again in RQ4 to quantify their marginal impact on IL (Qwen3-14B (LoRA)). 
+We then analyse the outputs with respect to concern count (RQ1), commit-message inclusion (RQ2), robustness under token-budget–constrained truncation (RQ3), and end-to-end inference efficiency (RQ4).
+
+\subsection{Experimental Setup}
+\label{sec:exp:setup}
+
+We adopt Qwen3-14B as our primary SLM because it provides open weights, a context window large enough for our inputs, and competitive performance among publicly available models~\citep{Yang2025Qwen3}.
+Its improved reasoning capability makes it suitable for the multi-step semantic decisions involved in tangled-commit classification.
+We evaluate both the base model and a LoRA-fine-tuned variant (rank $r=32$, $\alpha=48$, dropout 0.05), which enables task-specific adaptation while maintaining deployability on high-end consumer GPUs. These versions are hereafter referred to as Qwen3 and Qwen3-FT, respectively. 
+In addition, GPT-4.1 is used as an approximate upper bound for multi-label semantic concern detection.
+
+We do not compare with syntactic untangling tools~\citep{Herzig2011Untangling,Partachi2020Flexeme,Li2022UTANGO} because they produce structural partitions rather than semantic labels.
+Prior CCS classification studies~\citep{Zeng2025First,Li2024Understanding} are not included as baselines because they assume single-label classification and are not therefore directly comparable to our multi-label evaluation.
+Although these studies use decoder-only SLMs similar to ours, the difference in task formulation prevents a like-for-like comparison.
+Furthermore, we focus on decoder-only architectures to evaluate generative reasoning: models are prompted to generate chain-of-thought and label decisions in natural language rather than outputting fixed embeddings.
+Encoder-only models (e.g., CodeBERT) are strong classifiers but are not designed for our prompt-based generative setting and therefore are outside the scope of this study.
+
+We evaluate multi-label classification performance (RQ\numrange{1}{3}) using the Hamming loss (HL), defined as the fraction of misclassified labels per commit, averaged across all commits.
+HL penalises both missing and spurious labels symmetrically, yielding an interpretable per-label error rate.
+This property is well-suited to our setting: tangled commits activate varying subsets of the seven CCS types, and the number of active labels increases with the number of concerns.
+As complexity increases, both over-prediction and under-prediction errors accumulate, making a stable, label-count-invariant metric desirable.
+HL meets this requirement by applying a uniform penalty to each label error, independent of how many labels are active in a given commit.
+In contrast, F1-based metrics are more sensitive to aggregation choices and less directly tied to per-label misclassification rates in this setting~\citep{Wu2020Multilabel}.
+
+We measure efficiency (RQ4) using end-to-end inference latency (IL), defined as the wall-clock time from submitting the prompt to receiving the final output token~\citep{Chitty-Venkata2025LLMInferenceBench}.
+This follows established industry practice\footnote{\url{https://docs.nvidia.com/nim/benchmarking/llm/latest/metrics.html}} and reflects user-visible deployment cost.
+To account for non-determinism in generative inference, we run each configuration three times and remove outliers using the standard $1.5\times\mathrm{IQR}$ rule.
+Frontier LLMs show run-to-run variability, and even the locally deployed SLM can exhibit occasional noise despite fixed seeds.
+
+For RQ\numrange{1}{3}, we compare model configurations on the same set of commits using two-sided Wilcoxon signed-rank tests, and we report the resulting $p\text{-value}$s alongside the Vargha--Delaney effect size $\hat{A}_{12}$ to characterise both statistical and practical significance.
+$\hat{A}_{12}$ quantifies the probability that the first model produces higher values than the second, with values below 0.5 indicating a tendency towards lower values~\citep{Arcuri2014Hitchhikers}.
+For example, the values of $\hat{A}_{12} < 0.5$ indicate that the first model achieves lower HL than the second, meaning the first model is more accurate than the second.
+For efficiency analysis (RQ4), we compute Pearson’s correlation coefficient ($r$).
+
+All experiments are conducted on a high-performance computing cluster.
+Each GPU node is equipped with dual Intel Xeon Platinum 8358 (Ice Lake) CPUs and a single NVIDIA H100 GPU, and SLM inference runs on SUSE Liberty Linux~7.
+Although we use H100 GPUs to reduce runtime noise during large-scale experiments, the 14B-parameter SLM and its LoRA configuration fit within the memory budget of high-end consumer GPUs, so the reported IL can be interpreted as a practical lower bound.
+
+\subsection{RQ1: Impact of Concern Count}
+\label{sec:rq1}
+\subsubsection{Setup}
+RQ1 evaluates whether an SLM can approach a state-of-the-art LLM as the semantic complexity of a commit increases. 
+To isolate the effect of concern count, we vary the number of semantic concerns combined to form each tangled commit ($n \in {1,2,3,4,5}$) while keeping all other conditions fixed.
+Commit messages are always included, and the full diff content is supplied without truncation.
+The single-concern case ($n=1$) serves as the atomic baseline.
+
+\subsubsection{Results}
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{boxplot_model_performance.png}
+    \caption{Overall model performance}
+    \label{fig:model_performance}
+\end{figure}
+As shown in Figure~\ref{fig:model_performance}, GPT-4.1 exhibits the lowest overall HL distribution.
+Qwen3 shows consistently higher error distributions, whereas fine-tuning shifts the distribution closer to GPT-4.1.
+Qwen3-FT also exhibits shorter whiskers, indicating reduced variance and fewer extreme errors.
+This reduction in central tendency and spread relative to GPT-4.1 suggests that domain-specific fine-tuning narrows the performance gap between SLMs and LLMs.
+
+\begin{table}
+  \centering
+  \small
+  \caption{Pairwise comparisons across concern counts.
+  $\hat{A}_{12} < 0.5$ indicates lower HL for the left-hand model, meaning the left-hand model is more accurate.}
+  \label{tab:cc-pvalues}
+
+  \begin{tabular}{c rr rr rr}
+    \toprule
+    & \multicolumn{2}{c}{GPT-4.1 vs Qwen3}
+    & \multicolumn{2}{c}{GPT-4.1 vs Qwen3-FT}
+    & \multicolumn{2}{c}{Qwen3 vs Qwen3-FT} \\
+    \cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+    $n$ & $\hat{A}_{12}$ & $p\text{-value}$ & $\hat{A}_{12}$ & $p\text{-value}$ & $\hat{A}_{12}$ & $p\text{-value}$ \\
+    \midrule
+    1 & 0.431 & 0.022 & 0.563 & 0.003 & 0.633 & $<$ 0.001 \\
+    2 & 0.353 & $<$ 0.001 & 0.446 & 0.001 & 0.598 & $<$ 0.001 \\
+    3 & 0.155 & $<$ 0.001 & 0.399 & $<$ 0.001 & 0.751 & $<$ 0.001 \\
+    4 & 0.150 & $<$ 0.001 & 0.343 & $<$ 0.001 & 0.691 & $<$ 0.001 \\
+    5 & 0.237 & $<$ 0.001 & 0.440 & $<$ 0.001 & 0.676 & $<$ 0.001 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Table~\ref{tab:cc-pvalues} shows that all pairwise comparisons are statistically significant (all $p\text{-value}\le0.022$).
+Effect sizes ($\hat{A}_{12}$) quantify the practical magnitude of these differences: for atomic commits ($n{=}1$), the fine-tuned SLM slightly outperforms GPT-4.1 with a medium effect, whereas for $n\ge2$ GPT-4.1 consistently outperforms the base SLM with large effects.
+Fine-tuning yields large improvements over the base SLM across all concern counts, confirming that task-specific adaptation provides substantial gains even when the frontier LLM remains more robust at higher concern counts.
+Across models, both medians and tails rise with increasing $n$, indicating a monotonic degradation in performance as concern count grows.
+Qwen3-FT consistently shows lower HL distributions than its base variant across all concern counts.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{boxplot_concern_count_hamming_loss.png}
+    \caption{Hamming loss distribution across concern counts}
+    \label{fig:concerncount-boxplot}
+\end{figure}
+
+Figure~\ref{fig:concerncount-boxplot} reveals critical performance thresholds across concern counts. 
+In the atomic case ($n=1$), Qwen3-FT exhibits a lower central tendency than GPT-4.1, as reflected by the downward shift of the median and a tighter interquartile range.
+At $n=\numrange{2}{3}$ (the typical range reported in Section~\ref{sc:background}), the fine-tuned variant remains competitive with GPT-4.1.
+Consistent with the downward shift in median HL and the narrower interquartile range, the fine-tuned SLM shows substantially improved typical-case performance over the base model.
+When summarised using mean HL, this improvement corresponds to an error reduction on the order of \numrange{40}{55}\% for moderately tangled commits ($n=\numrange{2}{3}$); see the replication package (Section~\ref{sec:data-availability}) for detailed results.
+For $n=\numrange{4}{5}$, performance degrades across all models, while preserving the ordering $\text{GPT-4.1} \le \text{Qwen3-FT} \le \text{Qwen3}$.
+The performance gap between fine-tuned and base models remains substantial, particularly for moderately complex commits ($n=\numrange{2}{3}$).
+
+\begin{tcolorbox}
+\textbf{Answer to RQ1:}
+The answer to RQ1 is that multi-concern detection becomes progressively harder as concern count increases.
+While GPT-4.1 remains the most robust overall, fine-tuning significantly improves SLM reliability for low- and moderately tangled commits.
+A fine-tuned SLM achieves practically acceptable error rates for commits with up to three concerns, despite lower absolute performance than GPT-4.1.
+We therefore consider a fine-tuned SLM a practical default for low- and moderate-complexity commits, reserving LLMs or manual review for higher-complexity cases.
+\end{tcolorbox}
+
+\subsection{RQ2: Impact of Commit Message Inclusion}
+\label{sec:rq2}
+\subsubsection{Setup}
+RQ1 established how concern count affects model performance when full diffs and commit messages are available.
+Building on that foundation, RQ2 investigates whether commit messages provide additional semantic cues beyond code diffs alone and, crucially, how well each model performs when messages are absent.
+Real-world commit messages vary widely in quality, and many are incomplete, uninformative, or missing altogether.
+To isolate this effect, we compare two settings: one in which the commit message accompanies the diff and one in which it is omitted.
+
+All other aspects of the input remain fixed: full diff content is provided without truncation, and the analysis spans all concern-count levels to capture message effects across varying semantic complexity.
+
+\subsubsection{Results}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.90\linewidth]{boxplot_msg_impact_hamming_loss.png}
+    \caption{Impact of commit message inclusion on Hamming Loss}
+    \label{fig:msg-boxplot}
+\end{figure}
+
+\begin{table}
+    \centering
+    \small
+    \caption{Impact of commit message on model performance.
+    $\hat{A}_{12} > 0.5$ indicates a higher HL (i.e., less accurate) without the message.}
+    \label{tab:msgimpact-pvalues}
+    
+    \begin{tabular}{p{3cm} rr}
+      \toprule
+      Model & $\hat{A}_{12}$ & $p\text{-value}$ \\
+      \midrule
+      GPT-4.1 & 0.532 & 0.005 \\
+      Qwen3 & 0.533 & $<$ 0.001 \\
+      Qwen3-FT & 0.669 & $<$ 0.001 \\
+      \bottomrule
+    \end{tabular}
+\end{table}
+
+Figure~\ref{fig:msg-boxplot} shows the impact of commit message inclusion on detection accuracy across all models. 
+GPT-4.1 exhibits a small HL reduction when messages are included.
+Qwen3 shows a similar modest decrease, while Qwen3-FT shows a substantial reduction.
+As summarised in Table~\ref{tab:msgimpact-pvalues}, commit-message inclusion yields statistically significant improvements for all three models (all $p\text{-value}\le0.005$). 
+Effect sizes ($\hat{A}_{12}$) reveal substantial variation in magnitude: GPT-4.1 and the base SLM show only small effects, whereas the fine-tuned SLM exhibits a large effect, indicating a much stronger reliance on explicit semantic cues provided by commit messages.
+
+These results demonstrate that commit messages provide semantic cues that complement code diffs, with the effect being most pronounced for fine-tuned SLMs. 
+For Qwen3-FT, messages provide explicit semantic cues that help the model disambiguate multi-label classification tasks. 
+By contrast, GPT-4.1's stable performance suggests it can effectively infer intent from diffs alone, though messages still provide measurable benefit.
+Commit messages, therefore, represent a critical input modality, particularly for resource-efficient SLMs.
+
+While message inclusion consistently reduces HL across models, the improvement is most pronounced for SLMs, especially Qwen3-FT, where error rates drop sharply. 
+Practically, messages should be enabled by default in deployments, with especially large HL gains expected for resource-efficient SLMs.
+
+\begin{tcolorbox}
+\textbf{Answer to RQ2.}
+Commit-message inclusion consistently reduces HL across models, with the largest gains observed for the fine-tuned SLM. 
+GPT-4.1 can often infer intent from diffs alone, but still benefits from messages, whereas the SLM relies more strongly on these explicit semantic cues. 
+\end{tcolorbox}
+
+\subsection{RQ3: Robustness Under Token-Budget–Constrained Diff Truncation}
+\label{sec:rq3}
+RQ1 showed that concern count drives task difficulty, and RQ2 demonstrated that commit messages provide useful semantic cues.
+RQ3 examines a different practical constraint: how reliably an SLM can detect multiple concerns when the token budget is reduced, and different segments must be partially truncated. Such conditions are common in deployments of SLMs, where limited context windows and multi-concern commits compete for input space.
+
+To evaluate robustness under constrained input budgets, we vary the maximum number of tokens that can be allocated to the commit ($L \in {1024, 2048, 4096, 8192, 12288}$).
+Commit messages are always included, and all concern-count levels are evaluated.
+
+A header-preserving truncation policy is applied: diff headers and the earliest modified hunks are retained first, and trailing content is removed only when the budget is exceeded.
+Let $|p|$ and $|m|$ denote the token lengths of the preserved diff prefix and the commit message, respectively. 
+We define the remaining token budget for diff segments as \begin{equation} L' = \max(L - |m| - |p|, 0). \end{equation}
+The remaining capacity is divided evenly across the $n$ diff segments, and any segment exceeding its allocated share is truncated from the tail.
+This setup allows us to isolate the effect of selective, segment-level truncation without exceeding the model’s global context window.
+
+\subsubsection{Results}
+\begin{figure}
+  \centering
+  \includegraphics[width=\linewidth]{boxplot_context_length_hamming_loss.png}
+  \caption{Impact of token budget on Hamming Loss for different models}
+  \label{fig:context-HL}
+\end{figure}
+
+\begin{table}
+  \centering
+  \small
+  \caption{Pairwise comparisons across token budgets.
+$\hat{A}_{12} < 0.5$ indicates lower HL for the left-hand model, meaning the left-hand model is more accurate.}
+  \label{tab:ctxlen-pvalues}
+
+  \begin{tabular}{c rr rr rr}
+    \toprule
+    & \multicolumn{2}{c}{GPT-4.1 vs Qwen3}
+    & \multicolumn{2}{c}{GPT-4.1 vs Qwen3-FT}
+    & \multicolumn{2}{c}{Qwen3 vs Qwen3-FT} \\
+    \cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+    $L$ & $\hat{A}_{12}$ & $p\text{-value}$ & $\hat{A}_{12}$ & $p\text{-value}$ & $\hat{A}_{12}$ & $p\text{-value}$ \\
+    \midrule
+    1024 & 0.285 & $<$ 0.001 & 0.433 & $<$ 0.001 & 0.641 & $<$ 0.001 \\
+    2048 & 0.277 & $<$ 0.001 & 0.430 & $<$ 0.001 & 0.651 & $<$ 0.001 \\
+    4096 & 0.274 & $<$ 0.001 & 0.437 & $<$ 0.001 & 0.654 & $<$ 0.001 \\
+    8192 & 0.280 & $<$ 0.001 & 0.440 & $<$ 0.001 & 0.654 & $<$ 0.001 \\
+    12288 & 0.273 & $<$ 0.001 & 0.441 & $<$ 0.001 & 0.662 & $<$ 0.001 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+
+Figure~\ref{fig:context-HL} reveals that model performance remains largely stable across token lengths. 
+GPT-4.1 shows essentially stable performance across all budgets, with HL remaining around 0.10 and dropping only slightly to 0.09 at the full 12,288-token setting.
+Qwen3 exhibits similar stability with HL fluctuating minimally between 0.25 and 0.26 across all lengths.
+Qwen3-FT shows HL values ranging from 0.14 to 0.15, with no clear monotonic trend as $L$ increases.
+As summarised in Table~\ref{tab:ctxlen-pvalues}, all pairwise comparisons remain statistically significant across token budgets (all $p\text{-value}<0.001$). 
+Effect sizes ($\hat{A}_{12}$) remain highly stable across token budgets: GPT-4.1 consistently outperforms the base SLM with large effects, GPT-4.1 outperforms the fine-tuned SLM with medium effects, and fine-tuning consistently outperforms the base SLM with large effects. 
+This consistency indicates that token-budget–constrained truncation does not materially alter the relative ordering between model configurations.
+
+These results indicate that detection accuracy is highly robust to partial truncation of diff segments under our header-preserving policy. 
+Even under the smallest budget ($L{=}1024$), where truncation is most pronounced, all models perform comparably to the full-budget configuration ($L{=}12288$).
+In other words, truncating diff segments from the tail while retaining headers and early modified hunks does not materially degrade multi-concern detection performance, even when a substantial fraction of the diff tokens is removed.
+
+\begin{tcolorbox}
+\textbf{Answer to RQ3:}
+The answer to RQ3 is that, under a header-preserving truncation policy, detection accuracy remains stable across token budgets from \numrange{1024}{12288} tokens. 
+In our setting, commit messages and early diff regions provide sufficient semantic signal for SLMs to maintain multi-concern detection performance without full diff coverage, so deployments can reduce token budgets without substantial loss in accuracy.
+\end{tcolorbox}
+
+\subsection{RQ4: Inference Efficiency}
+\subsubsection{Setup}
+In RQ4, we focus on the Qwen3-FT model and quantify how concern count, commit-message inclusion, and token budget affect inference latency (IL).
+To ensure consistency with earlier research questions, we use the same dataset, experimental configurations, and token budget constraints as defined in Sections \ref{sec:rq1}–\ref{sec:rq3}.
+
+
+\subsubsection{Results}
+
+\paragraph{Experiment 1: Impact of Concern Count}
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{boxplot_concern_count_inference_time.png}
+\caption{Inference time by concern count}
+\label{fig:regression_concern_count}
+\end{figure}
+
+Figure~\ref{fig:regression_concern_count} shows that median IL rises monotonically as concern count increases from one to five. 
+Pearson correlation is strong ($r=0.81$), consistent with a monotonic increase in IL as concern count grows.
+The interquartile range widens at higher concern levels, indicating increased computational load because commits with more concerns contain more diff segments and therefore more input tokens. These results establish that concern counts as a primary driver of inference latency.
+
+\paragraph{Experiment 2: Impact of Message Inclusion}
+\begin{figure}
+\centering
+\includegraphics[width=0.9\linewidth]{boxplot_commit_message_inference_time.png}
+\caption{Inference time by commit message inclusion}
+\label{fig:commit_message_time_comparison}  
+\end{figure}
+
+Figure~\ref{fig:commit_message_time_comparison} shows overlapping box plots with nearly unchanged medians. Including commit messages added only ~0.03s of latency, a negligible overhead. 
+This weak association aligns with transformer execution patterns: message tokens form a short auxiliary segment appended to diffs, contributing marginally to the total input length. 
+This small increase is consistent with the fact that commit messages add relatively few tokens compared with diffs, and therefore contribute only marginally to overall input length and observed IL in our setting.
+From a deployment perspective, messages should be enabled by default for their semantic benefits (as shown in RQ2) rather than disabled for efficiency, as their IL impact is negligible.
+\paragraph{Experiment 3: Impact of Token Budget}
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.9\linewidth]{boxplot_input_tokens_inference_time.png}
+\caption{Inference time by token budget}
+\label{fig:input_tokens_time_comparison}
+\end{figure}
+
+Figure~\ref{fig:input_tokens_time_comparison} shows overlapping medians and interquartile ranges across token lengths, indicating minor IL increases as $L$ grows. 
+Correlation analysis reports a weak positive association (Pearson $r=0.23$). 
+While the computational cost of attention grows with input length~\citep{Vaswani2017Attention}, the observed effect on IL is modest relative to concern count.
+This suggests that token-length management (through truncation or summarization) provides incremental rather than substantial efficiency gains, making it a complementary but secondary optimization strategy.
+
+\begin{tcolorbox}
+\textbf{Answer to RQ4:}
+Inference latency scales with the total number of input tokens, which naturally increases as concern count grows. 
+Commit messages provide a cost-effective accuracy boost with negligible latency overhead, whereas diff size (which tends to grow with concern multiplicity) is the dominant practical driver of IL in our experiments.
+\end{tcolorbox}
+
+\subsection{Threats to Validity}
+We reduce construct validity risks by limiting the CCS taxonomy to reliably distinguishable types and excluding \texttt{chore}, \texttt{perf}, and \texttt{style} per prior refinements~\citep{Li2024Understanding,Zeng2025First}.
+This restriction means that our label space does not cover every possible real-world concern. 
+However, it focuses on types that prior work and our filtering indicate can be distinguished reliably. 
+Within this subset, we can assess multi-concern behaviour with less ambiguity in the underlying labels.
+At the same time, the synthetic tangled dataset yields a controlled benchmark in which concern count and token budget can be varied systematically, allowing us to study their effects under well-defined conditions without additional confounding from ambiguous labels.
+
+A key threat arises from stochastic variation in generative inference. We therefore repeat each experimental configuration three times and aggregate across runs, which mitigates the effect of sporadic runtime noise on both the frontier LLM and the local SLM.
+
+External validity is limited by our use of a synthesized tangled dataset rather than naturally tangled industrial commits, and the resulting tangles may omit some interleaving patterns or contextual dependencies found in real development histories.
+To mitigate this risk, the atomic pool is drawn from a verified CCS corpus~\citep{Zeng2025First}, and samples are stratified by concern count with uniform label sampling, ensuring balanced coverage of concern multiplicity even when natural label frequencies vary across repositories.
+The atomic commits span multiple projects and languages, and each synthesized tangle is manually verified for label correctness and concern-count consistency, which improves internal coherence and reduces annotation noise.
+Broader expert adjudication and evaluation on naturally tangled commits would further strengthen external validity.
+
+A further external validity threat concerns RQ3. 
+As shown in Figure~\ref{fig:token_length_by_concern}, the token-length distribution of our CCS-derived dataset spans a wide range, meaning that under our token-budget settings some commits are truncated while others remain within budget.
+Our robustness results therefore reflect this mixture and are specific to the header-preserving truncation policy we adopt, which always retains file headers and early modified hunks. 
+We do not examine alternative truncation schemes that remove these regions or truncate from the head or middle of the diff, and repositories with systematically longer or more fragmented diffs may behave differently under the same budgets. 
+Evaluating such alternative policies and longer-horizon histories is an important direction for future work.
+
+\subsection{Data Availability}\label{sec:data-availability}
+All artefacts produced in this study, including the tangled commit dataset, fine-tuned models, and supporting scripts, have been made publicly available to ensure reproducibility. 
+The tangled dataset used for evaluation is hosted on Hugging Face\footnote{\url{https://huggingface.co/datasets/Berom0227/tangled-ccs-commits}}.
+Fine-tuned models are also released on Hugging Face, including the base LoRA-adapter\footnote{\url{https://huggingface.co/Berom0227/Semantic-Concern-SLM-Qwen-adapter}}, 
+the merged full model\footnote{\url{https://huggingface.co/Berom0227/Semantic-Concern-SLM-Qwen}}, 
+and a \texttt{GGUF}-quantised model optimized for consumer-grade hardware\footnote{\url{https://huggingface.co/Berom0227/Semantic-Concern-SLM-Qwen-gguf}}.
+Supporting scripts, training configurations, evaluation pipelines, and extended result tables are archived on GitHub\footnote{\url{https://github.com/GoBeromsu/Detecting-Multiple-Semantic-Concerns-in-Tangled-Code-Commits-using-Small-Language-Models}}, 
+providing complete resources for reproducing the experimental results. 

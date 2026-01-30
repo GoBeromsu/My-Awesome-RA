@@ -1,0 +1,42 @@
+\section{Introduction}\label{sec:intro}
+
+Commits are the basic unit of change in version control systems (VCS), combining code modifications (i.e., \emph{diffs}) and textual descriptions (i.e., \emph{commit messages}) to convey developer intent.
+Modern software engineering practice encourages \emph{atomic commits}—small, coherent changes associated with a single, well-defined intent—because they facilitate code review, support debugging, and improve repository mining for research and automation \citep{Herzig2011Untangling}. 
+In this work, we define an atomic commit as \emph{syntactically coherent} (i.e., consistent at the line, method, and file levels) and \emph{semantically cohesive} (i.e., addressing exactly one semantic concern, such as a feature addition, a bug fix, or a refactoring).
+
+Building on this principle, the \emph{Conventional Commits Specification} (CCS) is widely used in industry as a lightweight standard for expressing commit intent (e.g., \texttt{feat} for adding features, \texttt{fix} for fixing bugs, \texttt{refactor} for refactoring, and \texttt{docs} for improving documentation) and encouraging structured, atomic commits \citep{ConventionalCommits2023}.
+Despite such guidelines, empirical studies show that commit atomicity is often violated in practice, as under time pressure or when tasks overlap, developers frequently combine multiple concerns into a single commit, resulting in tangled commits \citep{Herzig2013Impact,Barnett2015Helping,Partachi2020Flexeme}, obscuring developer intent and complicating maintenance. 
+
+Meanwhile, automated untangling has been studied based on heuristic and structural cues, such as partitioning by file paths \citep{Herzig2011Untangling,Herzig2013Impact}, dependency relations \citep{Barnett2015Helping,Shen2021SmartCommit}, abstract syntax tree (AST) proximity \citep{Muylaert2018Untangling}, and pattern templates mined from prior commits \citep{Kirinuki2014Hey}. 
+These approaches are simple and interpretable, and they are effective at capturing \emph{syntactic} proximity.
+However, they operate primarily through a structural lens and do not explicitly model the semantic intent underlying each change.
+Subsequent work introduced machine-learning classifiers that exploit structural features, while more recent deep-learning models embed code changes into graphs or vectors for automated partitioning \citep{Dias2015Untangling,Partachi2020Flexeme,Li2022UTANGO,Fan2024Detect,Xu2025Detecting}. Although these techniques achieve higher accuracy than purely heuristic rules, they still approximate atomicity mainly via syntactic cohesion and do not by themselves ensure that the resulting fragments align with a single, coherent developer intent.
+
+On the other hand, with advances in language models (LMs), recent studies increasingly consider \emph{semantic} concern based on code diffs and commit messages, and more recent work has begun to explore small language models (SLMs) for their computational efficiency and privacy \citep{Zeng2025First,Li2024Understanding}.
+This line of work ranges from binary detection (e.g., identifying defect-prone changes) \citep{Lin2023CCT5} to CCS-oriented intent inference, where messages encode explicit intent and diffs serve as supporting evidence. 
+However, most studies focus on single-label or binary classification, implicitly assuming one concern per commit and overlooking the fact that tangled commits often interleave multiple concerns \citep{Herzig2013Impact,Barnett2015Helping}.
+
+
+To address this gap, we formulate the problem as \textit{multi-label classification of semantic concerns}, aiming to detect multiple concerns within tangled commits. 
+We focus on SLMs rather than large language models (LLMs), considering computational efficiency and data privacy. 
+For example, unlike LLMs, SLMs can often be executed locally on modern laptops, enhancing data privacy by keeping sensitive code and commit messages on-device rather than transmitting them to centralized servers \citep{Lu2025Small}. 
+
+By focusing on SLMs, we aim to answer the following research questions.
+\begin{enumerate}[\bf RQ1]
+    \item \textit{What is the impact of the number of semantic concerns in a commit on multiple concern detection accuracy?} RQ1 evaluates how concern count—our operational proxy for atomicity and semantic complexity—affects multi-label detection accuracy and identifies the range in which a fine-tuned SLM remains a viable alternative to an LLM baseline.
+    \item \textit{How much does semantic information from commit messages contribute to detection accuracy?} While diffs contain the code changes, commit messages provide additional semantic context about developer intent and the rationale behind those changes. We systematically evaluate the impact of commit-message inclusion on detection accuracy by conducting controlled experiments with and without messages.
+    \item \textit{How robust is detection accuracy under realistic token-budget constraints when diffs are partially truncated using a header-preserving policy?} RQ3 evaluates the robustness of multi-concern detection under token-budget constraints using this header-preserving truncation policy.
+    \item \textit{How do the same factors examined in RQ\numrange{1}{3} affect inference efficiency for fine-tuned SLMs?} While RQ\numrange{1}{3} focus on accuracy, practical deployment also depends on whether an SLM can process commits quickly enough. By measuring how these task characteristics influence end-to-end latency, we characterize the computational costs associated with each factor and identify which constraints impose the greatest slowdown during inference.
+\end{enumerate}
+
+Our results show that the fine-tuned SLM remains competitive with an LLM baseline for single-concern classification ($n{=}1$).
+We also find that commit messages consistently improve performance.
+Under our header-preserving truncation policy, reducing the available token budget has only a limited effect on SLM accuracy and inference latency within the tested range. 
+This suggests that, in our setting, huge context windows may not be necessary when commits fit within modest budgets and informative diff prefixes are retained.
+
+To summarize, our key contributions are as follows:
+\begin{enumerate}[1.]
+    \item To the best of our knowledge, we provide the first systematic empirical study of the performance and efficiency of SLMs in detecting multiple concerns within tangled commits, analysing the impact of concern count, commit-message inclusion, and token-budget-constrained diff truncation.
+    \item We release our replication package, including a carefully crafted benchmark dataset of 1750 synthesised tangled commits derived from a CCS-labelled real-world commit corpus \citep{Zeng2025First}, fine-tuned models based on Qwen3-14B \citep{Yang2025Qwen3}, and supporting scripts, to facilitate future research on commit untangling and semantic analysis (see Section~\ref{sec:data-availability}).
+    \item We empirically demonstrate the usefulness of SLMs for multi-concern detection in tangled commits and identify key factors, including SLM fine-tuning and commit-message inclusion. We also show that large context windows are not always necessary within the tested token budgets and under our header-preserving truncation policy. 
+\end{enumerate}

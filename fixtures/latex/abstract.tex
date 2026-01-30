@@ -1,0 +1,13 @@
+\begin{abstract}
+
+Code commits in a version control system (e.g., Git) should be \textit{atomic}, i.e., focused on a single goal, such as adding a feature or fixing a bug.
+In practice, however, developers often bundle multiple concerns into \textit{tangled} commits, obscuring intent and complicating maintenance.
+Recent studies have used Conventional Commits Specification (CCS) and Language Models (LMs) to capture commit intent, demonstrating that Small Language Models (SLMs) can approach the performance of Large Language Models (LLMs) while maintaining efficiency and privacy. 
+However, they do not address tangled commits involving multiple concerns, leaving the feasibility of using LMs for multi-concern detection unresolved.
+
+In this paper, we frame multi-concern detection in tangled commits as a multi-label classification problem and construct a controlled dataset of artificially tangled commits based on real-world data.
+We then present an empirical study using SLMs to detect multiple semantic concerns in tangled commits, examining the effects of fine-tuning, concern count, commit-message inclusion, and header-preserving truncation under practical token-budget limits.
+Our results show that a fine-tuned 14B-parameter SLM is competitive with a state-of-the-art LLM for single-concern commits and remains usable for up to three concerns.
+In particular, including commit messages improves detection accuracy by up to 44\% (in terms of Hamming Loss) with negligible latency overhead, establishing them as important semantic cues. 
+\keywords{Tangled Commits \and Small Language Models \and Multi-label Classification}
+\end{abstract}

@@ -1,0 +1,114 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{natbib}
+
+\title{Understanding Transformer Architectures:\\A Survey of Attention Mechanisms}
+\author{Demo Author\\
+\texttt{demo@example.com}}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This paper provides an overview of transformer architectures and attention mechanisms
+that have revolutionized natural language processing and computer vision. We discuss
+the fundamental concepts behind self-attention, the architectural innovations of
+transformers, and their applications across various domains.
+\end{abstract}
+
+\section{Introduction}
+
+The transformer architecture, introduced in the seminal work ``Attention Is All You Need,''
+has fundamentally changed the landscape of deep learning. Unlike previous approaches
+based on recurrent neural networks (RNNs) or convolutional neural networks (CNNs),
+transformers rely entirely on attention mechanisms to capture dependencies between
+input and output sequences.
+
+% TODO: Add citation for "Attention Is All You Need"
+The key innovation of transformers is the self-attention mechanism, which allows the
+model to attend to different positions of the input sequence when computing
+representations. This enables parallelization during training and captures long-range
+dependencies more effectively than RNNs.
+
+\section{Background}
+
+\subsection{Attention Mechanisms}
+
+Attention mechanisms allow neural networks to focus on relevant parts of the input
+when producing an output. The basic attention function can be described as mapping
+a query and a set of key-value pairs to an output:
+
+\begin{equation}
+\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V
+\end{equation}
+
+where $Q$, $K$, and $V$ represent queries, keys, and values respectively, and $d_k$
+is the dimension of the keys.
+
+\subsection{Multi-Head Attention}
+
+Multi-head attention allows the model to jointly attend to information from different
+representation subspaces at different positions:
+
+\begin{equation}
+\text{MultiHead}(Q, K, V) = \text{Concat}(\text{head}_1, \ldots, \text{head}_h)W^O
+\end{equation}
+
+where each $\text{head}_i = \text{Attention}(QW_i^Q, KW_i^K, VW_i^V)$.
+
+\section{Transformer Architecture}
+
+The transformer follows an encoder-decoder structure using stacked self-attention
+and point-wise, fully connected layers. The encoder maps an input sequence to a
+sequence of continuous representations, which the decoder uses to generate the
+output sequence one element at a time.
+
+% TODO: Add citation for BERT
+Pre-trained language models like BERT have demonstrated the power of bidirectional
+transformers for understanding context in text. BERT uses masked language modeling
+and next sentence prediction to learn rich representations.
+
+\subsection{Positional Encoding}
+
+Since transformers do not have inherent notion of sequence order, positional
+encodings are added to the input embeddings:
+
+\begin{align}
+PE_{(pos, 2i)} &= \sin(pos / 10000^{2i/d_{model}}) \\
+PE_{(pos, 2i+1)} &= \cos(pos / 10000^{2i/d_{model}})
+\end{align}
+
+\section{Applications}
+
+\subsection{Natural Language Processing}
+
+Transformers have achieved state-of-the-art results in:
+\begin{itemize}
+    \item Machine translation
+    \item Text summarization
+    \item Question answering
+    \item Named entity recognition
+\end{itemize}
+
+\subsection{Computer Vision}
+
+Vision Transformers (ViT) have shown that transformers can match or exceed
+CNN-based approaches in image classification tasks when trained on sufficient data.
+
+\section{Conclusion}
+
+The transformer architecture represents a paradigm shift in deep learning.
+The self-attention mechanism enables efficient parallel computation and captures
+long-range dependencies effectively. Future research directions include improving
+computational efficiency and extending transformers to new domains.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

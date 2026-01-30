@@ -1,0 +1,95 @@
+\section{Background}
+\label{sc:background}
+This section introduces the essential concepts that the rest of the paper builds on.
+\subsection{Tangled Commits}
+\label{sc:bg:tc}
+
+In version control systems, a commit represents the smallest unit of change, combining code diffs and a commit message describing developer intent. 
+An \emph{atomic commit} is a change that addresses a single developer intent~\citep{Muylaert2018Untangling,Li2022UTANGO,Fan2024Detect}.
+However, developers frequently produce \emph{tangled commits} that intermix multiple concerns, often under time pressure or task overlap, which undermines clarity and complicates downstream tasks \citep{Fan2024Detect,Partachi2020Flexeme}.
+Studies report that over 90\% of tangled commits involve three or fewer concerns~\citep{Shen2021SmartCommit,Herzig2013Impact} and characterize tangling as a pragmatic trade-off under delivery pressure~\citep{Herzig2016Impact}.
+
+Accordingly, existing research has attempted to untangle commits automatically by analysing the structural relations among code changes.
+Early heuristic methods partitioned edits based on file paths and dependency graphs, achieving interpretability but often yielding false positives—commits that appear atomic yet contain multiple developer intents~\citep{Herzig2011Untangling,Herzig2013Impact,Kirinuki2014Hey,Barnett2015Helping}.
+Subsequent studies introduced machine learning classifiers with hand-engineered structural features to enhance separation accuracy~\citep{Dias2015Untangling,Partachi2020Flexeme}, as well as graph-partitioning methods that integrate program dependency information~\citep{Shen2021SmartCommit}.
+More recently, deep learning approaches have embedded code changes into vector or graph representations, enabling scalable and automated untangling~\citep{Li2022UTANGO,Fan2024Detect,Xu2025Detecting}.
+Despite these advances, existing approaches still treat atomicity through a structural lens, effectively equating it with syntactic cohesion.
+These models learn expressive associations between commit messages and code changes, yet they often fail to recover the explicit developer intent underlying each change.
+
+However, this persistent limitation arises from ambiguity in the definition of atomicity itself.
+The traditional notion of being \emph{single-purpose} captures structural unity but neglects the semantic dimension of \emph{why a change is made}.
+Atomicity, therefore, cannot be characterised solely in terms of a structural single-purpose criterion.
+Instead, atomicity should be defined to encompass both syntactic and semantic cohesion.
+An \emph{atomic commit} is therefore a change that is both syntactically and semantically cohesive, aligning structural unity with one consistent developer intent.
+
+The CCS provides a practical means to map developer intent to explicit \emph{semantic concerns}.
+Recent studies have leveraged language models capable of understanding both code and natural language to perform CCS-based classification, effectively identifying atomic commits through their expressed intent. 
+This line of research naturally extends toward multiple-concern detection, where a single commit may embody several distinct semantic concerns. 
+By enabling classification at the concern type level, CCS facilitates a more explicit capture of semantic intent—bridging the gap between structural cohesion and the developer’s underlying rationale for the change.
+
+\subsection{Conventional Commits Specification}
+\label{sc:bg:ccs}
+
+CCS defines the lightweight and uniform format for structuring commit messages~\citep{ConventionalCommits2023}.
+As illustrated in Figure~\ref{fig:ccs-format}, a CCS message consists of a typed header followed by an optional body and footer. 
+The header provides a concise description of the change and begins with a commit type indicating the developer’s intent.
+It has recently become the most widely adopted commit convention in practice~\citep{Zeng2025First}.
+The specification defines a set of commit types that describe the intent of code changes—such as \texttt{build}, \texttt{ci}, \texttt{docs}, \texttt{feat}, \texttt{fix}, \texttt{perf}, \texttt{refactor}, \texttt{style}, \texttt{test}, and \texttt{chore}.
+
+In practice, these intent categories overlap in real commit histories.
+Figure~\ref{fig:motivating-example} illustrates a borderline case drawn from the atomic-commit dataset~\citep{Zeng2025First}.
+The commit message announces a bug fix in a checkbox component, yet the diff updates both production code and the associated test.
+Under CCS, this commit activates the concerns \texttt{fix} (patching a bug in the codebase) and \texttt{test} (adding or correcting tests).
+Some developers might regard this as atomic because the test change is tightly coupled to the fix, whereas others would classify it as a tangled commit containing two concerns.
+This ambiguity motivates the need for clear classification guidelines.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.75\linewidth]{motivating_example.png}
+    \caption{Motivating example illustrating ambiguity between CCS types}
+    \label{fig:motivating-example}
+\end{figure}
+
+Furthermore, prior studies report notable category overlap and semantic ambiguity within this taxonomy~\citep{Zeng2025First,Li2024Understanding}.
+\citet{Zeng2025First} observed that CCS blends purpose-oriented types (\texttt{feat}, \texttt{fix}, \texttt{refactor}, \texttt{perf}, \texttt{style}) with object-oriented ones (\texttt{docs}, \texttt{test}, \texttt{ci}, \texttt{build}), which can lead to ambiguous cases.
+They proposed prioritizing the purpose dimension when both dimensions coexist.
+Meanwhile, \citet{Li2024Understanding} addressed this ambiguity by refining the taxonomy itself, removing \texttt{perf} and \texttt{chore}—labels that human annotators struggle to distinguish reliably—to improve consistency.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.8\linewidth]{CCS_format.png}
+    \caption{Conventional Commit Specification (CCS) format.}
+
+    \label{fig:ccs-format}
+\end{figure}
+\subsection{Language Models}
+\label{sec:background-lm}
+Transformer architectures introduced the attention mechanism that underpins modern foundation models \citep{Vaswani2017Attention}.
+Large language models (LLMs) such as GPT and LLaMA have shown strong effectiveness across software engineering tasks, including code generation and program repair~\citep{Fan2023Large,Hou2024Large}.
+Despite their capabilities, LLMs impose substantial computational cost and latency, making them impractical for on-device or frequent deployment~\citep{Lu2025Small,Belcak2025Small}.
+These cost, latency, and infrastructure demands have prompted growing interest in small language models (SLMs), which aim to retain practical utility while operating under modest resource budgets~\citep{Abdin2024Phi4,Yang2025Qwen3}.
+
+Small language models (SLMs) are designed for efficient deployment on the modest hardware budgets.
+However, the literature offers no single parameter threshold: some studies treat models around 5B parameters as SLMs~\citep{Lu2025Small}, others adopt 10B~\citep{Belcak2025Small}, and recent budget-trained variants extend to roughly 14B parameters~\citep{Abdin2024Phi4,Yang2025Qwen3}.
+To reconcile these differences, \citet{Belcak2025Small} argue against a fixed parameter cutoff, defining SLMs instead by deployment feasibility and design intent.
+They articulate three guiding principles:
+\begin{itemize}[-]
+\item \textbf{Timelessness}: Not limited by the hardware of a specific time.
+\item \textbf{Practicality}: Designed to run on widely available consumer devices with fast inference.
+\item \textbf{Motivation alignment}: Built to work well under limited resource budgets.
+\end{itemize}
+
+The performance of SLMs is strongly influenced by the quality of their training data~\citep{Hou2024Large}.
+Whereas LLMs can tolerate noisy, large-scale corpora, SLMs tend to learn more effectively from smaller and carefully curated datasets.
+Prior studies~\citep{Abdin2024Phi4,Li2024Understanding} show that SLMs trained on expert-validated, high-quality datasets can outperform much larger models, underscoring that data curation is a primary determinant of performance.
+Consequently, systematic filtering and expert validation are critical for building high-performing SLMs. 
+
+Beyond data quality, recent advancements focus on enhancing the reasoning capabilities of SLMs to handle more complex tasks.
+Chain-of-thought (CoT) prompting guides models to reason step by step, yielding better performance on tasks such as code generation and debugging, without modifying the model architecture~\citep{Fan2023Large,Hou2024Large,Abdin2024Phi4}.
+While early studies suggested that such reasoning capabilities were emergent abilities exclusive to large models, recent work demonstrates that they can be effectively transferred to SLMs through knowledge distillation~\citep{Ranaldi2024Aligning}.
+By aligning with the reasoning processes of larger teacher models, SLMs can learn to perform multi-step reasoning and code generation tasks with high accuracy.
+
+Fine-tuning is also essential for domain specialization of SLMs, but full retraining is computationally impractical. 
+Parameter-efficient fine-tuning (PEFT)~\citep{Liu2023Empirical}, which updates only a small subset of parameters while keeping the base model largely frozen, overcomes this limitation.
+Among PEFT methods, low-rank adaptation (LoRA)~\citep{Hu2021LoRA} provides efficient task adaptation and rapid task switching without increasing inference latency or degrading model quality~\citep{Liu2023Empirical}.
+By reducing computational and memory overhead, LoRA enables fine-tuning on consumer-grade hardware and can match or surpass larger models in software-engineering tasks; for example, a LoRA-tuned CodeLlama-7B achieved a 7\% accuracy gain over GPT-4 in a recent evaluation.

@@ -1,0 +1,13 @@
+\section{Conclusion}
+\label{sc:conclusion}
+To the best of our knowledge, this paper presents the first empirical study of multi-label semantic concern detection in tangled commits using SLMs.
+We refine the CCS taxonomy, construct a controlled-synthetic dataset of tangled commits, and evaluate a fine-tuned 14B-parameter SLM against GPT-4.1 while varying concern count, commit-message inclusion, and token–budget–constrained diff truncation.
+Our results show that multi-concern detection is feasible with SLMs at practical latency and cost, with error increasing as the number of concerns grows; a fine-tuned SLM performs best on single-concern commits and remains usable for up to three concerns, albeit with higher error than GPT-4.1.
+Commit messages yield consistent HL improvements with negligible latency cost, whereas token-budget–constrained inputs exhibit stable performance under header-preserving truncation, indicating that early diff context contains sufficient semantic signal.
+Latency is primarily driven by the number of concerns, with minimal overhead from commit messages or token-budget tuning.
+Domain-specialised SLMs are reliable for commits with one to three concerns, whereas more heavily tangled cases still benefit from LLM support or manual review.
+In addition, commit messages should be enabled by default, as they provide substantial accuracy gains with negligible latency cost.
+Preserving diff headers and early hunks appears more beneficial than enlarging context windows, indicating that effort is better spent on simple, robust preprocessing than on scaling context length.
+
+Future work will examine how individual concern types differ in detection difficulty, how semantic cues interact as the number of concerns increases, and which specific diff or message features most strongly influence detection outcomes. 
+We also plan to extend the evaluation to naturally tangled industrial histories and explore models that propose untangled commit partitions, moving beyond detection toward the longer-term goal of assisting developers in reconstructing tangled commits into more atomic units.

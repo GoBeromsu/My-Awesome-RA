@@ -1,0 +1,37 @@
+\section{Discussion}
+\label{sc:discussion}
+
+\subsection{Detecting Multiple Concerns using SLM}
+\label{sc:ds:slm}
+Tangled commits arise at the moment a commit is created, which places detection directly after the commit step within the VCS workflow. 
+Because committing is a daily and iterative activity for developers, any process coupled to this step inherits the same practical constraints.
+This includes the fact that a codebase constitutes a core organisational asset whose security and privacy requirements prevent repository data from being processed outside the VCS environment. 
+Consequently, tangled commit detection must be cost-sensitive, latency-sensitive, readily automatable, and executable entirely within local infrastructure to function effectively in real development contexts.
+As discussed in Section \ref{sc:evaluation}, the detection task itself remains structurally constrained and simple: the model receives a tangled commit and is required to classify a predefined multi-label output.
+
+Given these constraints, the detection component must operate as an internal module within the VCS workflow, and small language models align particularly well with this requirement. 
+The CCS provides a machine-readable structure that enables SLMs to interpret semantic concerns consistently, reducing dependence on complex reasoning or large context windows. 
+Their lightweight nature allows deployment directly within local or on-premise infrastructure, naturally satisfying the security and privacy constraints that prevent code from leaving private repositories. 
+Moreover, SLMs maintain predictable latency and can be invoked efficiently within CI/CD pipelines, making them a practical fit for commit-level automation where stability, responsiveness, and cost-efficiency are essential.
+
+\subsection{LLM vs SLM: What to Use in Practice}
+\label{sc:ds:llmvslm}
+Tangled commit detection varies in difficulty depending on the structure of the input.
+Our experiments show three consistent patterns.
+First, the problem becomes harder as the number of concerns increases.
+Second, commit messages reliably improve performance, although the model can still reason without them.
+Third, within our CCS-derived dataset, reducing the available token budget has little effect on difficulty, because most commits are short and our header-preserving truncation policy retains the most informative parts of each diff.
+
+For model selection, although LLMs provide broader context windows and stronger reasoning capabilities, prior work \cite{Belcak2025Small} shows that such capacity is often excessive for a repetitive, structurally constrained task like tangled commit detection.
+Our results reinforce this view. 
+Inference latency scales primarily with the total number of input tokens—which naturally grows with concern count—while commit messages offer a cost-effective accuracy boost with negligible latency overhead.
+With appropriate input design, SLM-based detection can be integrated directly into VCS pipelines, and most tangled commits—those with low concern counts, available commit messages, and diffs that comfortably fit within the context window—can be handled efficiently by SLMs..
+
+\subsection{Open Challenges}
+There are also challenges that remain unresolved for SLM-based multi-concern detection. 
+Although LLMs offer larger context windows and stronger general-purpose reasoning, prior work \cite{Belcak2025Small} shows that tasks built around fixed input formats and repetitive decision patterns gain little from LLM-scale capacity. Our multi-concern commit classification task follows this structure in practice, with short diffs, stable input layouts, and bounded label granularity. Under these conditions, SLMs are not only sufficient but often the most appropriate choice.
+
+On the modelling side, it is not yet clear what constitutes an optimal SLM configuration, as alternatives such as quantised large models, varied prompting strategies, retrieval-augmented contexts, or different fine-tuning schemes may yield substantially different behaviours. 
+Furthermore, the question of how to construct or curate training datasets remains unsettled, as it is not yet clear which commit characteristics, tangling patterns, or sampling strategies are most appropriate for fine-tuning models on this task.
+As discussed in Section~\ref{sc:ds:slm}, integrating the tangled commit detection into the VCS workflow raises several open design questions, including how such a component should be orchestrated, how fallback mechanisms ought to be structured, and how reliably the system would operate once deployed.
+Extending this integration towards automated untangling also remains unresolved, particularly for commits with unclear or overlapping semantic boundaries.
