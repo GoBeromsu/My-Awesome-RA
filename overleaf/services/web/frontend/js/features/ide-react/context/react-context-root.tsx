@@ -32,6 +32,8 @@ import { CommandRegistryProvider } from './command-registry-context'
 import { NewEditorTourProvider } from '@/features/ide-redesign/contexts/new-editor-tour-context'
 import { EditorSelectionProvider } from '@/shared/context/editor-selection-context'
 import importOverleafModules from '../../../../macros/import-overleaf-module.macro'
+import { EvidenceProvider } from '@modules/evidence-panel/frontend/js/context/evidence-context'
+import { ReferencesPanelProvider } from '@modules/evidence-panel/frontend/js/context/references-panel-context'
 
 const rootContextProviders = importOverleafModules('rootContextProviders') as {
   import: { default: ElementType }
@@ -53,6 +55,8 @@ export const ReactContextRoot: FC<
     EditorPropertiesProvider,
     EditorProvider,
     EditorViewProvider,
+    EvidenceProvider,
+    ReferencesPanelProvider,
     FileTreeDataProvider,
     FileTreeOpenProvider,
     FileTreePathProvider,
@@ -115,27 +119,31 @@ export const ReactContextRoot: FC<
                                             <Providers.ProjectSettingsProvider>
                                               <Providers.EditorManagerProvider>
                                                 <Providers.ReferencesProvider>
-                                                  <Providers.LocalCompileProvider>
-                                                    <Providers.DetachCompileProvider>
-                                                      <Providers.ChatProvider>
-                                                        <Providers.FileTreeOpenProvider>
-                                                          <Providers.OnlineUsersProvider>
-                                                            <Providers.MetadataProvider>
-                                                              <Providers.OutlineProvider>
-                                                                <Providers.CommandRegistryProvider>
-                                                                  <Providers.EditorSelectionProvider>
-                                                                    {
-                                                                      childrenWrappedWithDynamicProviders
-                                                                    }
-                                                                  </Providers.EditorSelectionProvider>
-                                                                </Providers.CommandRegistryProvider>
-                                                              </Providers.OutlineProvider>
-                                                            </Providers.MetadataProvider>
-                                                          </Providers.OnlineUsersProvider>
-                                                        </Providers.FileTreeOpenProvider>
-                                                      </Providers.ChatProvider>
-                                                    </Providers.DetachCompileProvider>
-                                                  </Providers.LocalCompileProvider>
+                                                  <Providers.EvidenceProvider>
+                                                    <Providers.ReferencesPanelProvider>
+                                                      <Providers.LocalCompileProvider>
+                                                      <Providers.DetachCompileProvider>
+                                                        <Providers.ChatProvider>
+                                                          <Providers.FileTreeOpenProvider>
+                                                            <Providers.OnlineUsersProvider>
+                                                              <Providers.MetadataProvider>
+                                                                <Providers.OutlineProvider>
+                                                                  <Providers.CommandRegistryProvider>
+                                                                    <Providers.EditorSelectionProvider>
+                                                                      {
+                                                                        childrenWrappedWithDynamicProviders
+                                                                      }
+                                                                    </Providers.EditorSelectionProvider>
+                                                                  </Providers.CommandRegistryProvider>
+                                                                </Providers.OutlineProvider>
+                                                              </Providers.MetadataProvider>
+                                                            </Providers.OnlineUsersProvider>
+                                                          </Providers.FileTreeOpenProvider>
+                                                        </Providers.ChatProvider>
+                                                      </Providers.DetachCompileProvider>
+                                                    </Providers.LocalCompileProvider>
+                                                      </Providers.ReferencesPanelProvider>
+                                                    </Providers.EvidenceProvider>
                                                 </Providers.ReferencesProvider>
                                               </Providers.EditorManagerProvider>
                                             </Providers.ProjectSettingsProvider>
