@@ -15,7 +15,7 @@ from src.services.embedding import EmbeddingService
 class IndexService:
     """Service for managing vector index using FAISS."""
 
-    def __init__(self) -> None:
+    def __init__(self, embedding_service: EmbeddingService | None = None) -> None:
         self.index_path = Path(os.getenv("VECTOR_STORE_PATH", "data/faiss"))
         self.index_path.mkdir(parents=True, exist_ok=True)
 
@@ -25,7 +25,8 @@ class IndexService:
 
         self._index: faiss.IndexFlatIP | None = None
         self._metadata: list[dict[str, Any]] = []
-        self._embedding_service = EmbeddingService()
+        # Use provided EmbeddingService or create a new one (for backward compatibility)
+        self._embedding_service = embedding_service or EmbeddingService()
 
         self._load_or_create_index()
 

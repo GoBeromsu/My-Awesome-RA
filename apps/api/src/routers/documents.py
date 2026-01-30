@@ -2,8 +2,9 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
+from src.dependencies import get_index_service, get_solar_service
 from src.models.document import (
     DocumentChunksResponse,
     DocumentIndexRequest,
@@ -18,13 +19,15 @@ router = APIRouter()
 
 @router.post("/parse", response_model=DocumentParseResponse)
 async def parse_document(
-    file: Annotated[UploadFile, File(description="PDF file to parse")]
+    file: Annotated[UploadFile, File(description="PDF file to parse")],
+    solar_service: Annotated[SolarService, Depends(get_solar_service)],
 ) -> DocumentParseResponse:
     """
     Parse a PDF document using SOLAR Document Parse API.
 
     Args:
         file: PDF file to parse.
+        solar_service: Shared SolarService instance.
 
     Returns:
         Parsed document content with structure.
@@ -34,7 +37,6 @@ async def parse_document(
 
     try:
         content = await file.read()
-        solar_service = SolarService()
         result = await solar_service.parse_document(content, file.filename)
 
         return DocumentParseResponse(
@@ -48,18 +50,21 @@ async def parse_document(
 
 
 @router.post("/index", response_model=DocumentIndexResponse)
-async def index_document(request: DocumentIndexRequest) -> DocumentIndexResponse:
+async def index_document(
+    request: DocumentIndexRequest,
+    index_service: Annotated[IndexService, Depends(get_index_service)],
+) -> DocumentIndexResponse:
     """
     Index a parsed document for evidence search.
 
     Args:
         request: Document content to index.
+        index_service: Shared IndexService instance.
 
     Returns:
         Index result with document ID and chunk count.
     """
     try:
-        index_service = IndexService()
         result = await index_service.index_document(
             document_id=request.document_id,
             content=request.content,
@@ -76,18 +81,21 @@ async def index_document(request: DocumentIndexRequest) -> DocumentIndexResponse
 
 
 @router.get("/{document_id}/chunks", response_model=DocumentChunksResponse)
-async def get_document_chunks(document_id: str) -> DocumentChunksResponse:
+async def get_document_chunks(
+    document_id: str,
+    index_service: Annotated[IndexService, Depends(get_index_service)],
+) -> DocumentChunksResponse:
     """
     Get all chunks for a document.
 
     Args:
         document_id: Document identifier.
+        index_service: Shared IndexService instance.
 
     Returns:
         List of document chunks.
     """
     try:
-        index_service = IndexService()
         chunks = await index_service.get_chunks(document_id)
 
         return DocumentChunksResponse(

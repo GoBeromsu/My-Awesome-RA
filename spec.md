@@ -33,6 +33,9 @@
 3. 섹션/`\cite` 클릭 → 우측 패널에 인용 메타 + 근거 후보
 4. 논문 PDF가 없으면 검색/다운로드/업로드 수행
 5. 임베딩 진행 상태 확인(대기/처리/완료/실패)
+6. (Evidence Panel) 글 작성 중 → 현재 paragraph 기반 자동 evidence 표시
+7. 다른 paragraph로 커서 이동 → 새로운 evidence 자동 검색
+8. 필요 시 검색창에서 수동 검색
 
 ## 6) 인용 근거 표시 규칙
 - 입력: 현재 섹션 또는 `\cite` 주변 문장
@@ -130,9 +133,20 @@ my-awesome-ra/
 
 ## 11) "우측 패널 + 인용 근거" 아키텍처 스펙
 ### UI 확장 지점 (Overleaf)
-- Overleaf 편집기 화면 우측에 Evidence Panel 모듈 추가
-- `editorSidebarComponents`를 통해 등록
-- 탭 구성: 기존 Components + Evidence Panel
+- **위치**: Editor 오른쪽 패널 (PDF 뷰어 위치)
+- **표시 방식**: PDF 토글과 무관하게 항상 보임 (toggle 가능)
+- **등록**: `mainEditorLayoutPanels` 모듈로 등록 (Chat Pane 패턴)
+- **토글 진입점**: 상단 툴바 아이콘 (PDF 토글 버튼 옆)
+
+### 검색 트리거 방식 (Hybrid)
+1. **Auto 모드 (기본)**
+   - 커서 위치 기반 자동 검색
+   - 단위: LaTeX paragraph (blank line 구분)
+   - Debounce: 500ms
+
+2. **Manual 모드**
+   - 상단 검색창으로 직접 검색
+   - 텍스트 선택 후 우클릭 → "Search Evidence"
 
 ### Evidence Panel 모듈 구조
 ```
