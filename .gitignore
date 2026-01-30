@@ -58,3 +58,23 @@ docker-compose.override.yml
 deployment/*.env
 deployment/overleaf-toolkit/config/overleaf.rc
 deployment/overleaf-toolkit/config/variables.env
+
+# LaTeX compile byproducts
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.out
+*.toc
+*.lof
+*.lot
+*.synctex.gz
+*.synctex(busy)
+
+# Overleaf local artifacts (monorepo)
+overleaf/develop/output/
+overleaf/develop/clsi-texlive/
+overleaf/develop/compiles/
+overleaf/develop/.env
+overleaf/**/node_modules/
