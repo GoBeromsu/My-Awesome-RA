@@ -15,11 +15,8 @@ from src.dependencies import get_index_service, get_solar_service
 from src.models.document import (
     DocumentChunksResponse,
     DocumentDeleteResponse,
-    DocumentIndexRequest,
-    DocumentIndexResponse,
     DocumentInfo,
     DocumentListResponse,
-    DocumentParseResponse,
     DocumentStatusResponse,
     DocumentUploadResponse,
 )
@@ -75,77 +72,6 @@ async def list_documents(
         ],
         total=len(documents),
     )
-
-
-@router.post("/parse", response_model=DocumentParseResponse)
-async def parse_document(
-    file: Annotated[UploadFile, File(description="PDF file to parse")],
-    solar_service: Annotated[SolarService, Depends(get_solar_service)],
-) -> DocumentParseResponse:
-    """
-    Parse a PDF document using SOLAR Document Parse API.
-
-    Args:
-        file: PDF file to parse.
-        solar_service: Shared SolarService instance.
-
-    Returns:
-        Parsed document content with structure.
-    """
-    if not file.filename or not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported")
-
-    try:
-        content = await file.read()
-        result = await solar_service.parse_document(content, file.filename)
-
-        return DocumentParseResponse(
-            filename=file.filename,
-            pages=result["pages"],
-            content=result["content"],
-            metadata=result.get("metadata", {}),
-        )
-    except Exception as e:
-        logger.exception(f"Error parsing document: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to parse document. Please try again later.",
-        ) from e
-
-
-@router.post("/index", response_model=DocumentIndexResponse)
-async def index_document(
-    request: DocumentIndexRequest,
-    index_service: Annotated[IndexService, Depends(get_index_service)],
-) -> DocumentIndexResponse:
-    """
-    Index a parsed document for evidence search.
-
-    Args:
-        request: Document content to index.
-        index_service: Shared IndexService instance.
-
-    Returns:
-        Index result with document ID and chunk count.
-    """
-    try:
-        result = await index_service.index_document(
-            document_id=request.document_id,
-            content=request.content,
-            metadata=request.metadata,
-        )
-
-        return DocumentIndexResponse(
-            document_id=result["document_id"],
-            chunk_count=result["chunk_count"],
-            status="indexed",
-        )
-    except Exception as e:
-        logger.exception(f"Error indexing document: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to index document. Please try again later.",
-        ) from e
 
 
 @router.get("/{document_id}/chunks", response_model=DocumentChunksResponse)
@@ -496,84 +422,4 @@ async def reindex_document(
         raise HTTPException(
             status_code=500,
             detail="Failed to reindex document. Please try again later.",
-        ) from e
-
-
-@router.post("/upload/sync", response_model=DocumentIndexResponse)
-async def upload_and_index_document_sync(
-    file: Annotated[UploadFile, File(description="PDF file to upload and index")],
-    solar_service: Annotated[SolarService, Depends(get_solar_service)],
-    index_service: Annotated[IndexService, Depends(get_index_service)],
-) -> DocumentIndexResponse:
-    """
-    Upload a PDF, parse it, and index it synchronously.
-
-    This is a synchronous version that waits for completion.
-    Use POST /documents/upload for background processing.
-
-    Args:
-        file: PDF file to upload.
-        solar_service: Shared SolarService instance.
-        index_service: Shared IndexService instance.
-
-    Returns:
-        Index result with document ID and chunk count.
-    """
-    if not file.filename or not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported")
-
-    try:
-        content = await file.read()
-
-        # Validate file size
-        if len(content) > MAX_FILE_SIZE:
-            raise HTTPException(
-                status_code=413,
-                detail=f"File too large. Maximum size is {MAX_FILE_SIZE // (1024 * 1024)} MB",
-            )
-
-        # Generate document_id from filename hash
-        file_hash = hashlib.sha256(content).hexdigest()[:12]
-        # Sanitize filename for document ID
-        safe_name = re.sub(r"[^\w\-\.]", "_", file.filename.rsplit(".", 1)[0])
-        document_id = f"{safe_name}_{file_hash}"
-
-        # Save PDF file for later retrieval
-        pdf_path = PDF_STORAGE_PATH / f"{document_id}.pdf"
-        pdf_path.write_bytes(content)
-
-        # Parse PDF
-        parsed = await solar_service.parse_document(content, file.filename)
-
-        # Index with metadata and grounding info
-        result = await index_service.index_document(
-            document_id=document_id,
-            content=parsed["content"],
-            metadata={
-                "title": file.filename.rsplit(".", 1)[0],
-                "source_pdf": file.filename,
-                "pages": parsed["pages"],
-                "indexed_at": datetime.now(timezone.utc).isoformat(),
-                **parsed.get("metadata", {}),
-            },
-            grounding=parsed.get("grounding"),
-        )
-
-        # Update status
-        _document_status[document_id] = {
-            "status": "indexed",
-            "message": "Indexing complete",
-            "chunk_count": result["chunk_count"],
-        }
-
-        return DocumentIndexResponse(
-            document_id=result["document_id"],
-            chunk_count=result["chunk_count"],
-            status="indexed",
-        )
-    except Exception as e:
-        logger.exception(f"Error in synchronous upload: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to process document. Please try again later.",
         ) from e
