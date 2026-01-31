@@ -3,18 +3,20 @@
 > **AI Agent for Reference-Grounded LaTeX Paper Writing**
 > Powered by [Upstage SOLAR API](https://console.upstage.ai/)
 
-논문 작성 시 현재 문단에 맞는 참고문헌 근거를 자동으로 찾아주는 Evidence Panel을 Overleaf CE에 통합한 프로젝트입니다.
+논문 작성 시 현재 문단에 맞는 참고문헌 근거를 자동으로 찾아주는 Evidence Panel을 Overleaf CE에 통합한 MVP 프로젝트입니다.
+
+## Demo
+
+![References Panel Demo](docs/images/demo.png)
 
 ## Features
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| **Evidence Search** | 현재 문단 기반 관련 근거 자동 검색 | ✅ API 완료 |
-| **Document Parse** | PDF → 텍스트 추출 (SOLAR Document Parse) | ✅ API 완료 |
-| **Vector Index** | FAISS 기반 시맨틱 검색 | ✅ 완료 |
-| **Evidence Panel UI** | Overleaf 우측 패널 | ✅ 코드 완료 |
-| **Paragraph Detection** | CodeMirror 커서 위치 추적 | ✅ 코드 완료 |
-| **Overleaf Integration** | 커스텀 Overleaf 빌드 | 🔄 진행 중 |
+| **Reference Library** | .bib 파일 기반 참고문헌 목록 관리 | ✅ 완료 |
+| **PDF Upload & Index** | PDF 업로드 → SOLAR 파싱 → FAISS 인덱싱 | ✅ 완료 |
+| **Evidence Search** | 현재 문단 기반 관련 근거 자동 검색 | ✅ 완료 |
+| **Overleaf Integration** | Rail Panel로 통합된 UI | ✅ 완료 |
 
 ## Architecture
 
@@ -22,10 +24,11 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                        Overleaf CE                          │
 │  ┌──────────────────┐    ┌────────────────────────────┐    │
-│  │   LaTeX Editor   │    │     Evidence Panel         │    │
-│  │  (CodeMirror)    │───▶│  - Auto/Manual Search      │    │
-│  │                  │    │  - Results Display         │    │
-│  └──────────────────┘    └────────────────────────────┘    │
+│  │   LaTeX Editor   │    │    References Panel        │    │
+│  │  (CodeMirror)    │───▶│  - .bib 파일 파싱          │    │
+│  │                  │    │  - PDF 업로드/인덱싱       │    │
+│  └──────────────────┘    │  - Evidence 검색           │    │
+│                          └────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
                                │
                                ▼
@@ -33,45 +36,21 @@
 │                    FastAPI Backend                          │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
 │  │   /evidence  │  │  /documents  │  │  /citations  │      │
-│  │    /search   │  │    /parse    │  │   /extract   │      │
+│  │    /search   │  │   /upload    │  │   /extract   │      │
 │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘      │
 │         │                 │                 │               │
 │         ▼                 ▼                 ▼               │
 │  ┌─────────────────────────────────────────────────────┐   │
 │  │              Upstage SOLAR API                      │   │
-│  │  • Embedding (solar-embedding-1-large-query)        │   │
+│  │  • Embedding (solar-embedding-1-large)              │   │
 │  │  • Document Parse                                   │   │
-│  │  • Information Extraction                           │   │
 │  └─────────────────────────────────────────────────────┘   │
 │         │                                                   │
 │         ▼                                                   │
 │  ┌──────────────┐                                          │
-│  │ FAISS Index  │  (Vector Store)                          │
+│  │ FAISS Index  │  (1024-dim vectors)                      │
 │  └──────────────┘                                          │
 └─────────────────────────────────────────────────────────────┘
-```
-
-## Upstage SOLAR API 활용
-
-### 1. Embedding API
-```python
-# 문단/청크 임베딩 생성
-embedding = await embedding_service.embed_query("The transformer architecture...")
-# → 4096차원 벡터 반환
-```
-
-### 2. Document Parse API
-```python
-# PDF에서 텍스트 추출
-result = await solar_service.parse_document(pdf_bytes, "paper.pdf")
-# → {"pages": 10, "content": "...", "metadata": {...}}
-```
-
-### 3. Information Extraction API
-```python
-# 인용 정보 추출
-citations = await solar_service.extract_information(text, "citation")
-# → {"title": "...", "authors": [...], "year": 2024}
 ```
 
 ## Quick Start
@@ -97,64 +76,38 @@ cp .env.example .env
 cd apps/api && uv sync
 ```
 
-### 2. Run API Server
+### 2. Run Overleaf (with Evidence Panel)
 
 ```bash
-./scripts/dev.sh
-# → http://localhost:8000
+# Build & Start
+cd overleaf/develop
+bin/build
+bin/dev web webpack
+
+# Access: http://localhost:80
+# Login: demo@example.com / Demo@2024!Secure
 ```
 
-### 3. Test API
+### 3. Run API Server
 
 ```bash
-# Health check
-curl http://localhost:8000/health
-
-# PDF 파싱
-curl -X POST http://localhost:8000/documents/parse \
-  -F "file=@paper.pdf"
-
-# 문서 인덱싱
-curl -X POST http://localhost:8000/documents/index \
-  -H "Content-Type: application/json" \
-  -d '{"document_id": "paper1", "content": "...", "metadata": {"title": "..."}}'
-
-# Evidence 검색
-curl -X POST http://localhost:8000/evidence/search \
-  -H "Content-Type: application/json" \
-  -d '{"query": "attention mechanism in transformers"}'
+cd apps/api
+uv run uvicorn src.main:app --reload --port 8080
 ```
 
-## Project Structure
+## Upstage SOLAR API 활용
 
+### 1. Embedding API
+```python
+# 문단/청크 임베딩 생성 (1024차원)
+embedding = await embedding_service.embed_query("The transformer architecture...")
 ```
-my-awesome-ra/
-├── apps/
-│   └── api/                    # FastAPI Backend
-│       ├── src/
-│       │   ├── main.py         # App entry
-│       │   ├── routers/        # API endpoints
-│       │   ├── services/       # Business logic
-│       │   │   ├── embedding.py    # SOLAR Embedding
-│       │   │   ├── index.py        # FAISS Index
-│       │   │   └── solar.py        # SOLAR APIs
-│       │   └── models/         # Pydantic models
-│       └── pyproject.toml
-│
-├── overleaf/                   # Forked Overleaf CE (submodule)
-│   └── services/web/modules/
-│       └── evidence-panel/     # Evidence Panel Module
-│           ├── frontend/js/
-│           │   ├── components/     # React UI
-│           │   ├── context/        # State management
-│           │   └── hooks/          # Custom hooks
-│           └── index.mjs
-│
-├── deployment/
-│   └── docker-compose.*.yml    # Docker configs
-│
-└── data/                       # Local data (gitignored)
-    └── faiss/                  # Vector index
+
+### 2. Document Parse API
+```python
+# PDF에서 텍스트 + 위치 정보 추출
+result = await solar_service.parse_document(pdf_bytes, "paper.pdf")
+# → {"pages": 10, "content": "...", "grounding": {...}}
 ```
 
 ## API Endpoints
@@ -162,37 +115,47 @@ my-awesome-ra/
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/health` | Health check |
+| `GET` | `/documents` | List indexed documents |
+| `POST` | `/documents/upload` | Upload & index PDF |
+| `POST` | `/documents/{id}/reindex` | Re-index document |
+| `DELETE` | `/documents/{id}` | Remove from index |
+| `GET` | `/documents/{id}/file` | Serve PDF file |
 | `POST` | `/evidence/search` | Search evidence by query |
-| `POST` | `/documents/parse` | Parse PDF (SOLAR) |
-| `POST` | `/documents/index` | Index document to FAISS |
-| `GET` | `/documents/{id}/chunks` | Get document chunks |
-| `POST` | `/citations/extract` | Extract citation info |
 
-## Development Status
+## Project Structure
 
-### ✅ Completed
-- [x] FastAPI backend with SOLAR API integration
-- [x] FAISS vector index for semantic search
-- [x] Evidence Panel React components
-- [x] CodeMirror paragraph detection extension
-- [x] Dependency injection & proper error handling
-
-### 🔄 In Progress
-- [ ] Custom Overleaf Docker build with Evidence Panel
-- [ ] E2E integration testing
-
-### 📋 TODO
-- [ ] PDF upload UI in Overleaf
-- [ ] BibTeX parsing for citation metadata
-- [ ] Caching for repeated searches
+```
+my-awesome-ra/
+├── apps/api/                      # FastAPI Backend
+│   └── src/
+│       ├── routers/               # API endpoints
+│       ├── services/              # SOLAR, FAISS, Embedding
+│       └── models/                # Pydantic schemas
+│
+├── overleaf/                      # Forked Overleaf CE (submodule)
+│   └── services/web/modules/
+│       └── evidence-panel/        # Evidence Panel Module
+│           ├── frontend/js/
+│           │   ├── components/    # React UI
+│           │   ├── context/       # State management
+│           │   └── hooks/         # Custom hooks
+│           └── stylesheets/
+│
+├── fixtures/
+│   ├── papers/                    # Sample PDFs
+│   └── seed/                      # Pre-built FAISS index
+│
+└── scripts/
+    └── index_fixtures.py          # Seed data indexer
+```
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|------------|
-| **AI/ML** | Upstage SOLAR (Embedding, Document Parse, IE) |
+| **AI/ML** | Upstage SOLAR (Embedding, Document Parse) |
 | **Backend** | FastAPI, FAISS, Python 3.11 |
-| **Frontend** | React, TypeScript, CodeMirror 6 |
+| **Frontend** | React 18, TypeScript, CodeMirror 6 |
 | **Editor** | Overleaf Community Edition |
 | **Infra** | Docker, uv |
 
@@ -202,4 +165,4 @@ AGPL-3.0 (Overleaf CE 호환)
 
 ---
 
-**Upstage AI 2기 홍보대사** | [GoBeromsu](https://github.com/GoBeromsu)
+Built with [Upstage SOLAR API](https://console.upstage.ai/) | [GoBeromsu](https://github.com/GoBeromsu)
