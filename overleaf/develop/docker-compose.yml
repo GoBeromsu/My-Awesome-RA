@@ -21,19 +21,14 @@ services:
   clsi:
     build:
       context: ..
-      dockerfile: services/clsi/Dockerfile
+      dockerfile: develop/Dockerfile.clsi-dev
     env_file:
       - dev.env
     environment:
-      - TEXLIVE_IMAGE=texlive-full # docker build texlive -t texlive-full
-      - SANDBOXED_COMPILES=true
-      - SANDBOXED_COMPILES_HOST_DIR_COMPILES=${PWD}/compiles
-      - SANDBOXED_COMPILES_HOST_DIR_OUTPUT=${PWD}/output
-    user: root
+      # Non-sandboxed compiles for dev (TexLive installed directly in container)
+      - SANDBOXED_COMPILES=false
+      - LISTEN_ADDRESS=0.0.0.0
     volumes:
-      - ${PWD}/compiles:/overleaf/services/clsi/compiles
-      - ${PWD}/output:/overleaf/services/clsi/output
-      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
       - clsi-cache:/overleaf/services/clsi/cache
 
   contacts:
