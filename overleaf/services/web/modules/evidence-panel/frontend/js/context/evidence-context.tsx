@@ -252,9 +252,8 @@ const EvidenceTrackerIntegration: FC = () => {
       // Trigger search if paragraph is non-empty
       if (paragraph) {
         searchEvidence(paragraph)
-
-        // Dispatch event to show Evidence view in PDF panel
-        window.dispatchEvent(new CustomEvent(EVIDENCE_SHOW_EVENT))
+        // Note: Auto-panel switching removed. Users must explicitly click
+        // the Evidence button to switch to Evidence view.
       }
     },
     [searchEvidence, setCurrentParagraph]
