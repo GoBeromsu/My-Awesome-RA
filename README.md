@@ -49,14 +49,13 @@ flowchart LR
 
 ### Upstage API Endpoints
 
-| API | Endpoint | Model/Config | 용도 |
-|-----|----------|--------------|------|
-| **Embeddings** | `/v1/solar/embeddings` | `solar-embedding-1-large-query` (쿼리)<br>`solar-embedding-1-large-passage` (문서) | 텍스트 벡터화 (4096차원) |
-| **Document Parse** | `/v1/document-ai/document-parse` | Output: `html`, `text` | PDF → 텍스트/HTML 변환 + 페이지 위치 정보 |
-| **Chat Completions** | `/v1/solar/chat/completions` | `solar-pro` (temp: 0.7, max_tokens: 2048) | RAG 기반 대화형 답변 생성 |
-| **Information Extraction** | `/v1/document-ai/information-extraction` | Schema: `citation` | 참고문헌 메타데이터 추출 |
-
 Base URL: `https://api.upstage.ai`
+
+| API | Endpoint | 용도 |
+|-----|----------|------|
+| **Embeddings** | `/v1/solar/embeddings` | 텍스트 벡터화 (쿼리/문서 임베딩) |
+| **Document Parse** | `/v1/document-ai/document-parse` | PDF 파싱 (텍스트 추출 + 페이지 위치 정보) |
+| **Chat Completions** | `/v1/solar/chat/completions` | RAG 기반 대화형 답변 생성 |
 
 ## 왜 My Awesome RA인가?
 
