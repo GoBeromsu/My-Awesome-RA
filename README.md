@@ -3,20 +3,49 @@
 > **AI Agent for Reference-Grounded LaTeX Paper Writing**
 > Powered by [Upstage SOLAR API](https://console.upstage.ai/)
 
-논문 작성 시 현재 문단에 맞는 참고문헌 근거를 자동으로 찾아주는 Evidence Panel을 Overleaf CE에 통합한 MVP 프로젝트입니다.
+**My Awesome RA**는 논문 작성 중 *현재 작성 중인 문단*에 맞는 참고문헌 근거를 자동으로 찾아주는 **Evidence Panel 기반 AI Agent**입니다.
+Overleaf Community Edition(CE)을 포크하여, 에디터 내부에서 **근거 탐색 → 확인 → 인용**까지 한 흐름으로 수행할 수 있도록 설계되었습니다.
+
+---
+
+## Why My Awesome RA?
+
+논문 작성 과정에서 가장 자주 흐름이 끊기는 지점은 **근거를 찾고 검증하는 순간**입니다.
+My Awesome RA는 다음 질문에 즉시 답하는 것을 목표로 합니다.
+
+* *“이 문장을 뒷받침하는 근거가 뭐였지?”*
+* *“어디 페이지를 인용한 거지?”*
+* *“에디터를 벗어나지 않고 확인할 수 없을까?”*
+
+---
 
 ## Demo
 
-![References Panel Demo](docs/images/demo.png)
+![Evidence Panel Demo](docs/images/demo.png)
+
+---
 
 ## Features
 
-| Feature | Description | Status |
-|---------|-------------|--------|
-| **Reference Library** | .bib 파일 기반 참고문헌 목록 관리 | ✅ 완료 |
-| **PDF Upload & Index** | PDF 업로드 → SOLAR 파싱 → ChromaDB 인덱싱 | ✅ 완료 |
-| **Evidence Search** | 현재 문단 기반 관련 근거 자동 검색 | ✅ 완료 |
-| **Overleaf Integration** | Rail Panel로 통합된 UI | ✅ 완료 |
+| Feature                   | Description                       | Status |
+| ------------------------- | --------------------------------- | ------ |
+| **Evidence Search**       | 현재 문단 의미 기반 근거 자동 검색 (500ms 디바운스) | ✅      |
+| **Chat Panel**            | 참고문헌 기반 RAG 질의응답                  | ✅      |
+| **PDF Upload & Indexing** | PDF → SOLAR 파싱 → ChromaDB 인덱싱     | ✅      |
+| **Reference Library**     | `.bib` 기반 참고문헌 목록 관리              | ✅      |
+
+---
+
+## How It Works (High-Level)
+
+1. 사용자가 LaTeX 문단을 작성합니다.
+2. 에디터가 현재 커서 위치의 문단을 감지합니다.
+3. 문단 의미를 기반으로 관련 참고문헌 구간을 검색합니다.
+4. Evidence Panel에서 근거를 즉시 확인하고 인용합니다.
+
+> 핵심은 **“검색하지 않아도, 쓰는 순간 근거가 보인다”**는 점입니다.
+
+---
 
 ## Architecture
 
@@ -24,10 +53,10 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                        Overleaf CE                          │
 │  ┌──────────────────┐    ┌────────────────────────────┐    │
-│  │   LaTeX Editor   │    │    Evidence Panel          │    │
-│  │  (CodeMirror)    │───▶│  - .bib 파일 파싱          │    │
-│  │                  │    │  - PDF 업로드/인덱싱       │    │
-│  └──────────────────┘    │  - Evidence 검색           │    │
+│  │   LaTeX Editor   │    │    Evidence Panel Module   │    │
+│  │  (CodeMirror 6)  │───▶│  - Evidence 자동 검색      │    │
+│  │                  │    │  - Chat (RAG Q&A)          │    │
+│  └──────────────────┘    │  - PDF 업로드/인덱싱       │    │
 │                          └────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
                                │
@@ -35,15 +64,16 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                    FastAPI Backend                          │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │   /evidence  │  │  /documents  │  │  /citations  │      │
-│  │    /search   │  │   /upload    │  │   /extract   │      │
+│  │ /evidence    │  │ /documents   │  │ /chat        │      │
+│  │ /search      │  │ /upload      │  │ /ask         │      │
 │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘      │
 │         │                 │                 │               │
 │         ▼                 ▼                 ▼               │
 │  ┌─────────────────────────────────────────────────────┐   │
-│  │              Upstage SOLAR API                      │   │
-│  │  • Embedding (solar-embedding-1-large, 4096-dim)    │   │
+│  │                 Upstage SOLAR API                   │   │
+│  │  • Embeddings (4096-dim)                             │   │
 │  │  • Document Parse                                   │   │
+│  │  • Chat Completions (solar-pro)                     │   │
 │  └─────────────────────────────────────────────────────┘   │
 │         │                                                   │
 │         ▼                                                   │
@@ -53,127 +83,105 @@
 └─────────────────────────────────────────────────────────────┘
 ```
 
+---
+
 ## Quick Start
 
 ### Prerequisites
-- Docker & Docker Compose
-- [Upstage API Key](https://console.upstage.ai/)
 
-### One-Command Demo (Recommended)
+* Docker & Docker Compose
+* [Upstage API Key](https://console.upstage.ai/)
+
+---
+
+### Demo Mode (Recommended)
 
 ```bash
-# Clone
 git clone --recursive https://github.com/GoBeromsu/my-awesome-ra.git
 cd my-awesome-ra
 
-# Environment
 cp .env.example .env
-# Edit .env and set UPSTAGE_API_KEY
+# set UPSTAGE_API_KEY
 
-# Start demo (auto-initializes everything)
-cd deployment && docker compose --profile demo up
+cd deployment
+docker compose up --build
 
-# Access: http://localhost
-# Login: demo@example.com / Demo@2024!Secure
+./scripts/setup-demo.sh
 ```
+
+* Access: [http://localhost](http://localhost)
+* Login: `demo@example.com` / `Demo@2024!Secure`
+
+---
 
 ### Development Mode
 
 ```bash
-# With webpack hot reload
-cd deployment && docker compose --profile dev up
+# Build CLSI (first time)
+cd overleaf
+docker build -f develop/Dockerfile.clsi-dev -t develop-clsi .
 
-# Access: http://localhost (Overleaf)
-# API: http://localhost:8000 (FastAPI)
-# Webpack: http://localhost:3808
+# Start dev services
+cd develop
+docker compose up -d mongo redis web webpack clsi filestore docstore document-updater history-v1 real-time
+
+# Init MongoDB replica set
+docker exec develop-mongo-1 mongosh --quiet --eval "rs.initiate()"
+
+# Setup demo
+CONTAINER_NAME=develop-web-1 ./scripts/setup-demo.sh
 ```
-
-### Manual Setup (Advanced)
-
-```bash
-# Install API dependencies
-cd apps/api && uv sync
-
-# Run API server
-uv run uvicorn src.main:app --reload --port 8000
-
-# Run Overleaf (in another terminal)
-cd overleaf/develop && bin/dev web webpack
-```
-
-### Build Optimization (Optional)
-
-```bash
-# Build base image separately for faster subsequent rebuilds (~10-15 min once)
-docker build -f overleaf/server-ce/Dockerfile-base -t sharelatex/sharelatex-base:latest overleaf/server-ce/
-
-# Then regular builds will be much faster (~2-3 min)
-cd deployment && docker compose build
-```
+---
 
 ## API Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/health` | Health check |
-| `GET` | `/documents` | List indexed documents |
-| `POST` | `/documents/parse` | Parse PDF (SOLAR API) |
-| `POST` | `/documents/index` | Index to ChromaDB |
-| `GET` | `/documents/{id}/chunks` | Get document chunks |
-| `DELETE` | `/documents/{id}` | Remove from index |
-| `POST` | `/evidence/search` | Search evidence by query |
-
-## Project Structure
-
-```
-my-awesome-ra/
-├── apps/api/                      # FastAPI Backend
-│   └── src/
-│       ├── routers/               # API endpoints
-│       ├── services/              # SOLAR, ChromaDB, Embedding
-│       └── models/                # Pydantic schemas
-│
-├── overleaf/                      # Forked Overleaf CE (submodule)
-│   └── services/web/modules/
-│       └── evidence-panel/        # Evidence Panel Module
-│           ├── frontend/js/
-│           │   ├── components/    # React UI
-│           │   ├── contexts/      # State management
-│           │   └── hooks/         # Custom hooks
-│           └── stylesheets/
-│
-├── deployment/                    # Docker Compose files
-│   └── docker-compose.dev.yml     # Development environment
-│
-├── fixtures/
-│   ├── latex/                     # Demo LaTeX files
-│   └── seed/                      # Pre-built ChromaDB index (29 papers)
-│
-└── scripts/
-    ├── regenerate_seed.py         # Seed data regenerator
-    └── setup-demo.sh              # Demo user/project setup
-```
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|------------|
-| **AI/ML** | Upstage SOLAR (Embedding 4096-dim, Document Parse) |
-| **Backend** | FastAPI, ChromaDB, Python 3.11 |
-| **Frontend** | React 18, TypeScript, CodeMirror 6 |
-| **Editor** | Overleaf Community Edition |
-| **Infra** | Docker Compose, uv |
-
-## Credentials
-
-| Environment | Email | Password |
-|-------------|-------|----------|
-| Demo | `demo@example.com` | `Demo@2024!Secure` |
-
-## License
-
-AGPL-3.0 (Overleaf CE 호환)
+| Method   | Endpoint                 | Description              |
+| -------- | ------------------------ | ------------------------ |
+| `GET`    | `/health`                | Health check             |
+| `POST`   | `/evidence/search`       | Search evidence by query |
+| `POST`   | `/chat/ask`              | RAG Q&A                  |
+| `POST`   | `/documents/upload`      | Upload & index PDF       |
+| `GET`    | `/documents/{id}/status` | Indexing status          |
+| `DELETE` | `/documents/{id}`        | Remove document          |
 
 ---
 
-Built with [Upstage SOLAR API](https://console.upstage.ai/) | [GoBeromsu](https://github.com/GoBeromsu)
+## Project Structure
+
+```text
+my-awesome-ra/
+├── apps/api/              # FastAPI backend
+├── overleaf/              # Forked Overleaf CE
+│   └── evidence-panel/    # Evidence Panel module
+├── deployment/            # Docker Compose
+├── fixtures/              # Demo data
+└── scripts/               # Setup & utilities
+```
+
+---
+
+## Tech Stack
+
+| Layer    | Technology                              |
+| -------- | --------------------------------------- |
+| AI       | Upstage SOLAR (Embeddings, Parse, Chat) |
+| Backend  | FastAPI, ChromaDB                       |
+| Frontend | React, TypeScript, CodeMirror 6         |
+| Editor   | Overleaf CE                             |
+| Infra    | Docker Compose                          |
+
+---
+
+## Configuration
+
+| Variable          | Required | Description    |
+| ----------------- | :------: | -------------- |
+| `UPSTAGE_API_KEY` |     ✅    | SOLAR API key  |
+| `CHUNK_SIZE`      |          | Default: `500` |
+| `CHUNK_OVERLAP`   |          | Default: `100` |
+
+---
+
+## License
+
+AGPL-3.0 (compatible with Overleaf CE)
