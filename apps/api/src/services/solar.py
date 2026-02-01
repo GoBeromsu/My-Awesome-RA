@@ -157,6 +157,52 @@ class SolarService:
         )
         return response.json()
 
+    async def chat_completion(
+        self,
+        messages: list[dict[str, str]],
+        model: str = "solar-pro",
+        temperature: float = 0.7,
+        max_tokens: int = 2048,
+    ) -> str:
+        """
+        Generate chat completion using SOLAR Chat API.
+
+        Args:
+            messages: List of message dicts with 'role' and 'content'.
+            model: Model name (default: solar-pro).
+            temperature: Sampling temperature (0-1).
+            max_tokens: Maximum tokens to generate.
+
+        Returns:
+            Generated text response.
+        """
+        client = await self._get_client()
+
+        async def make_request() -> httpx.Response:
+            return await client.post(
+                "https://api.upstage.ai/v1/solar/chat/completions",
+                json={
+                    "model": model,
+                    "messages": messages,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                },
+            )
+
+        response = await self._request_with_retry(
+            make_request,
+            operation_name="Chat completion",
+        )
+        data = response.json()
+
+        # Extract the assistant's response
+        choices = data.get("choices", [])
+        if not choices:
+            logger.warning("Chat completion returned empty choices")
+            return ""
+
+        return choices[0].get("message", {}).get("content", "")
+
     async def close(self) -> None:
         """Close the HTTP client."""
         if self._client:
