@@ -101,6 +101,16 @@ uv run uvicorn src.main:app --reload --port 8000
 cd overleaf/develop && bin/dev web webpack
 ```
 
+### Build Optimization (Optional)
+
+```bash
+# Build base image separately for faster subsequent rebuilds (~10-15 min once)
+docker build -f overleaf/server-ce/Dockerfile-base -t sharelatex/sharelatex-base:latest overleaf/server-ce/
+
+# Then regular builds will be much faster (~2-3 min)
+cd deployment && docker compose build
+```
+
 ## API Endpoints
 
 | Method | Endpoint | Description |

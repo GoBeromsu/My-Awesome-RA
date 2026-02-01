@@ -2,7 +2,10 @@
 # Usage: cd deployment && docker compose up --build
 #
 # Full Overleaf build with all Evidence Panel modifications
-# Build time: ~15 min (first build), cached rebuilds much faster
+# Build time: ~15 min (first build), ~2-3 min (cached rebuilds)
+#
+# For faster builds, build base image first:
+# docker build -f ../overleaf/server-ce/Dockerfile-base -t sharelatex/sharelatex-base:latest ../overleaf/server-ce/
 
 services:
   # Overleaf CE with Evidence Panel (full build)
@@ -10,6 +13,9 @@ services:
     build:
       context: ../overleaf
       dockerfile: server-ce/Dockerfile
+      cache_from:
+        - sharelatex/sharelatex-base:latest
+        - deployment-overleaf-web:latest
     container_name: overleaf-web
     ports:
       - "80:80"

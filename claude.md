@@ -17,8 +17,16 @@ cd overleaf/develop && bin/dev web webpack
 
 # Demo environment (production build)
 cd deployment && docker compose up --build
-# Wait ~2 min, then: ../scripts/setup-demo.sh
+# Wait ~2 min, then: ./scripts/setup-demo.sh
 # → http://localhost (demo@example.com / Demo@2024!Secure)
+
+# IMPORTANT: After modifying Dockerfile-base, rebuild in this order:
+# 1. Base image (contains TexLive packages)
+docker build -f overleaf/server-ce/Dockerfile-base -t sharelatex/sharelatex-base:latest overleaf/server-ce/
+# 2. Main image (uses base image)
+cd deployment && docker compose build --no-cache overleaf-web
+# 3. Restart containers
+docker compose up -d && ./scripts/setup-demo.sh
 
 # Frontend tests (inside Docker)
 docker exec develop-web-1 sh -c "cd /overleaf/services/web && npm run test:frontend -- --grep 'Evidence'"
@@ -120,6 +128,8 @@ color: #333;
 
 - Webpack success ≠ working UI. Check browser console for runtime errors.
 - Frontend verification loop: Webpack → Console → Visual (in order)
+- **Docker image layering**: `overleaf-web` depends on `sharelatex-base`. If you modify `Dockerfile-base`, you MUST rebuild base first, then main image. Otherwise the old base image is used.
+- **Verify package installation**: After base image rebuild, check with `docker run --rm sharelatex/sharelatex-base:latest kpsewhich <package>.sty`
 
 ## API Endpoints
 

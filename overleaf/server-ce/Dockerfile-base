@@ -76,6 +76,34 @@ RUN mkdir /install-tl-unx \
       synctex \
       etoolbox \
       xetex \
+# Additional packages for academic paper compilation (|| true to continue on missing packages)
+&&  tlmgr install --repository ${TEXLIVE_MIRROR} \
+      multirow \
+      paralist \
+      natbib \
+      orcidlink \
+      siunitx \
+      algorithm2e \
+      booktabs \
+      tcolorbox \
+      caption \
+      subcaption \
+      setspace \
+      xcolor \
+      graphics \
+      hyperref \
+      amsmath \
+      amsfonts \
+      tools \
+      oberdiek \
+      pgf \
+      environ \
+      trimspaces \
+      float \
+      ifoddpage \
+      relsize \
+      cm \
+      || true \
 &&  tlmgr path add \
 &&  rm -rf /install-tl-unx
 
