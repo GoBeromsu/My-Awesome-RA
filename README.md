@@ -21,7 +21,11 @@ My Awesome RA는 다음 질문에 즉시 답하는 것을 목표로 합니다.
 
 ## Demo
 
+### Evidence Panel
 ![Evidence Panel Demo](docs/images/demo.png)
+
+### Reference Library
+![Reference Library](docs/images/reference-library.png)
 
 ---
 
@@ -85,6 +89,81 @@ My Awesome RA는 다음 질문에 즉시 답하는 것을 목표로 합니다.
 
 ---
 
+## Core Feature Flows
+
+### Evidence Panel Flow
+
+```mermaid
+sequenceDiagram
+    participant User as User (LaTeX Editor)
+    participant EP as Evidence Panel
+    participant API as FastAPI Backend
+    participant Solar as Upstage SOLAR
+    participant DB as ChromaDB
+
+    User->>EP: 문단 작성 (커서 이동)
+    EP->>EP: 500ms 디바운스
+    EP->>API: POST /evidence/search
+    API->>Solar: Embed query (4096-dim)
+    Solar-->>API: Query embedding
+    API->>DB: Similarity search (top-k)
+    DB-->>API: Relevant chunks
+    API-->>EP: Evidence results + scores
+    EP-->>User: 관련 근거 표시 (relevance %)
+```
+
+### Chat Panel Flow (RAG Q&A)
+
+```mermaid
+sequenceDiagram
+    participant User as User
+    participant Chat as Chat Panel
+    participant API as FastAPI Backend
+    participant Solar as Upstage SOLAR
+    participant DB as ChromaDB
+
+    User->>Chat: "내 논문 어때?"
+    Chat->>API: POST /chat/ask
+    API->>Solar: Embed question
+    Solar-->>API: Question embedding
+    API->>DB: Retrieve relevant context
+    DB-->>API: Top-k chunks
+    API->>Solar: Chat completion (solar-pro)
+    Note over API,Solar: System prompt + context + question
+    Solar-->>API: AI response with citations
+    API-->>Chat: Formatted answer
+    Chat-->>User: 답변 + 출처 표시
+```
+
+### Reference Library Flow
+
+```mermaid
+flowchart LR
+    subgraph Upload["PDF Upload"]
+        A[.bib 파일] --> B[Reference Library]
+        C[PDF 파일] --> D[Upload Button]
+    end
+
+    subgraph Process["Processing"]
+        D --> E[SOLAR Document Parse]
+        E --> F[Text Chunking]
+        F --> G[SOLAR Embedding]
+    end
+
+    subgraph Store["Storage"]
+        G --> H[(ChromaDB)]
+        B --> I[BibTeX Metadata]
+    end
+
+    subgraph Query["Query"]
+        H --> J[Evidence Search]
+        H --> K[Chat RAG]
+        I --> J
+    end
+```
+
+---
+
 ## Quick Start
 
 ### Prerequisites
@@ -96,21 +175,30 @@ My Awesome RA는 다음 질문에 즉시 답하는 것을 목표로 합니다.
 
 ### Demo Mode (Recommended)
 
+One command brings up Overleaf + RA API + seeded demo project (user created automatically).
+
 ```bash
 git clone --recursive https://github.com/GoBeromsu/my-awesome-ra.git
 cd my-awesome-ra
 
-cp .env.example .env
-# set UPSTAGE_API_KEY
-
+export UPSTAGE_API_KEY=<your_upstage_key>
 cd deployment
-docker compose up --build
-
-./scripts/setup-demo.sh
+docker compose --profile demo up -d   # add --build after code changes
+# wait ~1–2 min; optional: docker compose logs -f demo-init
 ```
 
-* Access: [http://localhost](http://localhost)
-* Login: `demo@example.com` / `Demo@2024!Secure`
+Access: [http://localhost](http://localhost)  
+Login: `demo@example.com` / `Demo@2024!Secure`  
+Demo project: **“Upstage ambassador demo”** (pre-loaded with LaTeX files; fixture images are skipped if history service is disabled—safe to ignore warnings).
+
+Reset to a fresh demo state (wipe data volumes):
+
+```bash
+cd deployment
+docker compose down
+docker volume rm deployment_overleaf-data deployment_api-data deployment_mongo-data deployment_redis-data
+docker compose --profile demo up -d
+```
 
 ---
 
