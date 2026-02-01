@@ -256,24 +256,27 @@ async function createDemoProject() {
         console.error('Added:', clsFile);
     }
 
-    // Add image files
+    // Add image files (with error handling - history service may not be configured)
     const imageFiles = fs.readdirSync(fixturesDir).filter(f =>
         f.endsWith('.png') || f.endsWith('.jpg') || f.endsWith('.jpeg') || f.endsWith('.pdf')
     );
 
     for (const imageFile of imageFiles) {
         const filePath = path.join(fixturesDir, imageFile);
-
-        await ProjectEntityUpdateHandler.promises.addFile(
-            projectId,
-            rootFolderId,
-            imageFile,
-            filePath,
-            null,
-            userId,
-            'demo-setup'
-        );
-        console.error('Added image:', imageFile);
+        try {
+            await ProjectEntityUpdateHandler.promises.addFile(
+                projectId,
+                rootFolderId,
+                imageFile,
+                filePath,
+                null,
+                userId,
+                'demo-setup'
+            );
+            console.error('Added image:', imageFile);
+        } catch (err) {
+            console.error('Warning: Could not add image (history service may not be configured):', imageFile);
+        }
     }
 
     // Output project ID to stdout
