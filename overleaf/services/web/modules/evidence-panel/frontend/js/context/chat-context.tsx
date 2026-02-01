@@ -7,6 +7,7 @@ import React, {
   useState,
   type ReactNode,
 } from 'react'
+import { useEditorManagerContext } from '@/features/ide-react/context/editor-manager-context'
 
 export interface ChatSource {
   text: string
@@ -54,6 +55,19 @@ interface ApiResponse {
   question: string
 }
 
+interface ApiChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+
+/**
+ * Convert ChatMessage array to API format for conversation history.
+ */
+function toApiHistory(messages: ChatMessage[]): ApiChatMessage[] {
+  return messages.map(m => ({ role: m.role, content: m.content }))
+}
+
 function transformSources(
   sources: ApiResponse['sources']
 ): ChatSource[] {
@@ -76,6 +90,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const [error, setError] = useState<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
+  // Get the editor manager context to access current document content
+  const { getCurrentDocValue } = useEditorManagerContext()
+
   const sendMessage = useCallback(async (question: string) => {
     if (!question.trim()) return
 
@@ -84,6 +101,12 @@ export function ChatProvider({ children }: ChatProviderProps) {
       abortControllerRef.current.abort()
     }
     abortControllerRef.current = new AbortController()
+
+    // Get current editor content for context-aware Q&A
+    const documentContext = getCurrentDocValue() || undefined
+
+    // Capture current messages for conversation history (before adding new message)
+    const conversationHistory = toApiHistory(messages)
 
     // Add user message
     const userMessage: ChatMessage = {
@@ -101,7 +124,12 @@ export function ChatProvider({ children }: ChatProviderProps) {
       const response = await fetch(`${API_BASE_URL}/chat/ask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: question.trim(), top_k: 5 }),
+        body: JSON.stringify({
+          question: question.trim(),
+          top_k: 10,
+          document_context: documentContext,
+          conversation_history: conversationHistory,
+        }),
         signal: abortControllerRef.current.signal,
       })
 
@@ -133,7 +161,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
       setError(err instanceof Error ? err.message : 'Failed to send message')
       setStatus('error')
     }
-  }, [])
+  }, [messages, getCurrentDocValue])
 
   const clearHistory = useCallback(() => {
     if (abortControllerRef.current) {
