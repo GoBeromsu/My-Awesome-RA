@@ -17,8 +17,6 @@ const defaultSearchState: EvidenceSearchState = {
 const defaultContextValue: EvidenceContextValue = {
   searchState: defaultSearchState,
   currentParagraph: '',
-  autoMode: false,
-  setAutoMode: () => {},
   searchEvidence: async () => {},
   setCurrentParagraph: () => {},
   clearResults: () => {},

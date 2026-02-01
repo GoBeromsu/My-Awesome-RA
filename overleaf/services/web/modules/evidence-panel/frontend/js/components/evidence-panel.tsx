@@ -1,10 +1,7 @@
-import React, { useContext, useEffect, useState } from 'react'
-import { useTranslation } from 'react-i18next'
-import { Form, Nav, Tab } from 'react-bootstrap'
+import React, { useContext } from 'react'
 import { useEvidenceContext } from '../context/evidence-context'
 import { EvidenceSearchBar } from './evidence-search-bar'
 import { EvidenceList } from './evidence-list'
-import { ReferencesTab } from './references-tab'
 import { FullSizeLoadingSpinner } from '@/shared/components/loading-spinner'
 import MaterialIcon from '@/shared/components/material-icon'
 import withErrorBoundary from '@/infrastructure/error-boundary'
@@ -12,136 +9,73 @@ import { ReferencesContext } from '@/features/ide-react/context/references-conte
 
 import '../../stylesheets/evidence-panel.scss'
 
-type TabKey = 'search' | 'references'
+const EvidencePanelContent = React.memo(function EvidencePanelContent() {
+  const { searchState, searchEvidence, clearResults } = useEvidenceContext()
 
-const SearchTabContent = React.memo(function SearchTabContent() {
-  const {
-    searchState,
-    currentParagraph,
-    autoMode,
-    setAutoMode,
-    searchEvidence,
-    clearResults,
-  } = useEvidenceContext()
-
-  // Get reference keys for cited/non-cited differentiation
   const referencesContext = useContext(ReferencesContext)
   const referenceKeys = referencesContext?.referenceKeys
 
-  const handleManualSearch = (query: string) => {
-    searchEvidence(query)
-  }
+  const { status, results, total, error } = searchState
+  const isLoading = status === 'loading'
+  const hasResults = results.length > 0
 
-  const isLoading = searchState.status === 'loading'
-  const hasResults = searchState.results.length > 0
-  const hasError = searchState.status === 'error'
-  const isIdle = searchState.status === 'idle'
+  function renderContent(): React.ReactNode {
+    if (isLoading) {
+      return (
+        <div className="evidence-loading">
+          <FullSizeLoadingSpinner delay={200} />
+          <div className="evidence-loading-text">Searching...</div>
+        </div>
+      )
+    }
 
-  return (
-    <div className="evidence-search-tab">
-      <div className="evidence-search-controls">
-        <Form.Check
-          type="switch"
-          id="evidence-auto-toggle"
-          label="Auto"
-          checked={autoMode}
-          onChange={() => setAutoMode(!autoMode)}
-          className="evidence-auto-toggle"
-        />
-      </div>
+    if (status === 'error') {
+      return (
+        <div className="evidence-error">
+          <MaterialIcon type="error_outline" />
+          <div className="evidence-error-message">{error || 'Search failed'}</div>
+          <button className="btn btn-secondary btn-sm" onClick={clearResults}>
+            Clear
+          </button>
+        </div>
+      )
+    }
 
-      <EvidenceSearchBar onSearch={handleManualSearch} disabled={isLoading} />
+    if (hasResults) {
+      return (
+        <>
+          <div className="evidence-results-header">
+            <span className="evidence-results-count">
+              {total} result{total !== 1 ? 's' : ''} found
+            </span>
+            <span className="evidence-results-note">(Estimated relevance)</span>
+          </div>
+          <EvidenceList results={results} referenceKeys={referenceKeys} />
+        </>
+      )
+    }
 
-      {autoMode && currentParagraph && (
-        <div className="evidence-current-context">
-          <div className="evidence-context-label">Current paragraph:</div>
-          <div className="evidence-context-text">
-            {currentParagraph.length > 100
-              ? `${currentParagraph.slice(0, 100)}...`
-              : currentParagraph}
+    if (status === 'success') {
+      return (
+        <div className="evidence-no-results">
+          <MaterialIcon type="search_off" />
+          <div>No evidence found</div>
+          <div className="evidence-no-results-hint">
+            Try a different search or check your indexed documents
           </div>
         </div>
-      )}
+      )
+    }
 
-      <div className="evidence-panel-content">
-        {isLoading && (
-          <div className="evidence-loading">
-            <FullSizeLoadingSpinner delay={200} />
-            <div className="evidence-loading-text">Searching...</div>
-          </div>
-        )}
-
-        {hasError && (
-          <div className="evidence-error">
-            <MaterialIcon type="error_outline" />
-            <div className="evidence-error-message">
-              {searchState.error || 'Search failed'}
-            </div>
-            <button
-              className="btn btn-secondary btn-sm"
-              onClick={clearResults}
-            >
-              Clear
-            </button>
-          </div>
-        )}
-
-        {!isLoading && !hasError && hasResults && (
-          <>
-            <div className="evidence-results-header">
-              <span className="evidence-results-count">
-                {searchState.total} result{searchState.total !== 1 ? 's' : ''} found
-              </span>
-              <span className="evidence-results-note">
-                (Estimated relevance)
-              </span>
-            </div>
-            <EvidenceList
-              results={searchState.results}
-              referenceKeys={referenceKeys}
-            />
-          </>
-        )}
-
-        {!isLoading && !hasError && !hasResults && !isIdle && (
-          <div className="evidence-no-results">
-            <MaterialIcon type="search_off" />
-            <div>No evidence found</div>
-            <div className="evidence-no-results-hint">
-              Try a different search or check your indexed documents
-            </div>
-          </div>
-        )}
-
-        {isIdle && (
-          <div className="evidence-placeholder">
-            <MaterialIcon type="auto_stories" />
-            <div className="evidence-placeholder-title">
-              {autoMode ? 'Start writing' : 'Search for evidence'}
-            </div>
-            <div className="evidence-placeholder-hint">
-              {autoMode
-                ? 'Evidence will appear as you write paragraphs'
-                : 'Enter a query above to search your references'}
-            </div>
-          </div>
-        )}
+    return (
+      <div className="evidence-placeholder">
+        <MaterialIcon type="auto_stories" />
+        <div className="evidence-placeholder-title">Search for evidence</div>
+        <div className="evidence-placeholder-hint">
+          Enter a query above to search your references
+        </div>
       </div>
-    </div>
-  )
-})
-
-const EvidencePanelContent = React.memo(function EvidencePanelContent() {
-  const { t } = useTranslation()
-  const [activeTab, setActiveTab] = useState<TabKey>('search')
-  const [isOpenedOnce, setIsOpenedOnce] = useState(false)
-
-  useEffect(() => {
-    setIsOpenedOnce(true)
-  }, [])
-
-  if (!isOpenedOnce) {
-    return null
+    )
   }
 
   return (
@@ -153,34 +87,13 @@ const EvidencePanelContent = React.memo(function EvidencePanelContent() {
         </h2>
       </div>
 
-      <Tab.Container
-        activeKey={activeTab}
-        onSelect={(k) => k && setActiveTab(k as TabKey)}
-      >
-        <Nav variant="tabs" className="evidence-panel-tabs">
-          <Nav.Item>
-            <Nav.Link eventKey="search">
-              <MaterialIcon type="search" />
-              <span>Search</span>
-            </Nav.Link>
-          </Nav.Item>
-          <Nav.Item>
-            <Nav.Link eventKey="references">
-              <MaterialIcon type="folder" />
-              <span>References</span>
-            </Nav.Link>
-          </Nav.Item>
-        </Nav>
+      <div className="evidence-search-section">
+        <EvidenceSearchBar onSearch={searchEvidence} disabled={isLoading} />
+      </div>
 
-        <Tab.Content className="evidence-panel-tab-content">
-          <Tab.Pane eventKey="search">
-            <SearchTabContent />
-          </Tab.Pane>
-          <Tab.Pane eventKey="references">
-            <ReferencesTab />
-          </Tab.Pane>
-        </Tab.Content>
-      </Tab.Container>
+      <div className="evidence-panel-content">
+        {renderContent()}
+      </div>
     </aside>
   )
 })
