@@ -46,11 +46,17 @@ class IndexService:
         for env_key, meta_key in int_fields.items():
             value = os.getenv(env_key)
             if value:
-                metadata[meta_key] = int(value)
+                try:
+                    metadata[meta_key] = int(value)
+                except ValueError:
+                    logger.warning(f"Invalid integer for {env_key}: {value}, skipping")
 
         resize_factor = os.getenv("HNSW_RESIZE_FACTOR")
         if resize_factor:
-            metadata["hnsw:resize_factor"] = float(resize_factor)
+            try:
+                metadata["hnsw:resize_factor"] = float(resize_factor)
+            except ValueError:
+                logger.warning(f"Invalid float for HNSW_RESIZE_FACTOR: {resize_factor}, skipping")
 
         batch_size = metadata.get("hnsw:batch_size")
         sync_threshold = metadata.get("hnsw:sync_threshold")
@@ -287,12 +293,12 @@ class IndexService:
         if not grounding:
             return {"page": 1}
 
-        # Get sorted pages from grounding info
-        pages = sorted({
+        # Get page numbers from grounding info
+        pages = {
             info["page"]
             for info in grounding.values()
             if isinstance(info, dict) and "page" in info
-        })
+        }
 
         if not pages:
             return {"page": 1}
