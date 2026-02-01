@@ -3,8 +3,8 @@
 > **참고문헌 기반 LaTeX 논문 작성을 위한 AI 에이전트**
 > [Upstage SOLAR API](https://console.upstage.ai/) 기반
 
-**My Awesome RA**는 논문 작성 중 *현재 작성 중인 문단*에 맞는 참고문헌 근거를 자동으로 찾아주는 **Evidence Panel 기반 AI Agent**입니다.
-[Overleaf Community Edition(CE)](https://github.com/overleaf/overleaf)을 포크하여, 에디터 내부에서 **근거 탐색 → 확인 → 인용**까지 한 흐름으로 수행할 수 있도록 설계되었습니다.
+**My Awesome RA**는 논문 작성 중 참고문헌 근거를 자동으로 찾고, 질의응답하며, 문서를 관리하는 **AI 논문 작성 어시스턴트**입니다.
+[Overleaf Community Edition(CE)](https://github.com/overleaf/overleaf)을 포크하여, 에디터 내부에서 **근거 탐색 → 질의응답 → 문서 관리 → 인용**까지 한 흐름으로 수행할 수 있도록 설계되었습니다.
 
 ## 시스템 개요
 
