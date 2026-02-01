@@ -79,12 +79,12 @@ My Awesome RA는 다음 질문에 즉시 답하는 것을 목표로 합니다.
 
 ## 기능
 
-| 기능                      | 설명                                | 상태 |
-| ------------------------- | --------------------------------- | ------ |
-| **Evidence Search**       | 문단 변경 시 자동 검색 (500ms 디바운스) + 수동 검색 지원 | ✅      |
-| **Chat Panel**            | 참고문헌 기반 RAG 질의응답                  | ✅      |
-| **PDF Upload & Indexing** | PDF → SOLAR 파싱 → ChromaDB 인덱싱     | ✅      |
-| **Reference Library**     | PDF 업로드 기반 참고문헌 관리 (cite key 선택적 연결) | ✅      |
+| 기능                      | 설명                                |
+| ------------------------- | --------------------------------- |
+| **Evidence Search**       | 문단 변경 시 자동 검색 (500ms 디바운스) + 수동 검색 지원 |
+| **Chat Panel**            | 참고문헌 기반 RAG 질의응답                  |
+| **PDF Upload & Indexing** | PDF → SOLAR 파싱 → ChromaDB 인덱싱     |
+| **Reference Library**     | PDF 업로드 기반 참고문헌 관리 (cite key 선택적 연결) |
 
 ## 핵심 기능 흐름
 
