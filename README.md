@@ -228,9 +228,9 @@ docker compose --profile demo up -d   # 코드 변경 후에는 --build 추가
 # 1-2분 대기; 선택사항: docker compose logs -f demo-init
 ```
 
-접속: [http://localhost](http://localhost)
-로그인: `demo@example.com` / `Demo@2024!Secure`
-데모 프로젝트: **"Upstage ambassador demo"** — 저자의 논문 [Detecting Multiple Semantic Concerns in Tangled Code Commits](https://arxiv.org/abs/2601.21298)를 사용합니다 (LaTeX 파일 사전 로드됨; history 서비스 비활성화 시 fixture 이미지 경고는 무시해도 됨).
+- 접속: [http://localhost](http://localhost)
+- 로그인: `demo@example.com` / `Demo@2024!Secure`
+- 데모 프로젝트: **"Upstage ambassador demo"** — 저자의 논문 [Detecting Multiple Semantic Concerns in Tangled Code Commits](https://arxiv.org/abs/2601.21298)를 사용합니다 (LaTeX 파일 사전 로드됨; history 서비스 비활성화 시 fixture 이미지 경고는 무시해도 됨).
 
 초기 상태로 리셋 (데이터 볼륨 삭제):
 
