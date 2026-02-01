@@ -5,15 +5,24 @@ AI service for reference-grounded LaTeX paper writing. AGPL-3.0 license.
 ## Commands
 
 ```bash
-# API server (standalone)
-cd apps/api && source .venv/bin/activate && uv run uvicorn src.main:app --reload
+# API server (standalone) - requires .env with UPSTAGE_API_KEY
+cd apps/api && source .venv/bin/activate && \
+  set -a && source ../../.env && set +a && \
+  uv run uvicorn src.main:app --reload --port 8000
 
 # Backend tests
 cd apps/api && pytest -v --tb=short
 
-# Dev environment (hot reload)
-cd overleaf/develop && bin/dev web webpack
-# → http://localhost (Evidence Panel + live reload)
+# Dev environment (hot reload) - Full stack with all services
+# First time: build CLSI with TexLive (takes ~2 min)
+cd overleaf && docker build -f develop/Dockerfile.clsi-dev -t develop-clsi .
+# Start all services
+cd overleaf/develop && docker compose up -d mongo redis web webpack clsi filestore docstore document-updater history-v1 real-time
+# Initialize MongoDB replica set (first time only):
+docker exec develop-mongo-1 mongosh --quiet --eval "rs.initiate()"
+# Setup demo user and project:
+CONTAINER_NAME=develop-web-1 ./scripts/setup-demo.sh
+# → http://localhost (Evidence Panel + live reload + PDF compile)
 
 # Demo environment (production build)
 cd deployment && docker compose up --build
@@ -32,7 +41,13 @@ docker compose up -d && ./scripts/setup-demo.sh
 docker exec develop-web-1 sh -c "cd /overleaf/services/web && npm run test:frontend -- --grep 'Evidence'"
 
 # Webpack status
-docker compose -f overleaf/develop/docker-compose.yml logs webpack --tail 20 | grep -E "compiled|error"
+cd overleaf/develop && docker compose logs webpack --tail 20 | grep -E "compiled|error"
+
+# Stop dev environment
+cd overleaf/develop && docker compose down
+
+# Stop demo environment
+cd deployment && docker compose down
 ```
 
 ## Credentials
@@ -130,11 +145,13 @@ color: #333;
 - Frontend verification loop: Webpack → Console → Visual (in order)
 - **Docker image layering**: `overleaf-web` depends on `sharelatex-base`. If you modify `Dockerfile-base`, you MUST rebuild base first, then main image. Otherwise the old base image is used.
 - **Verify package installation**: After base image rebuild, check with `docker run --rm sharelatex/sharelatex-base:latest kpsewhich <package>.sty`
+- **Dev CLSI with TexLive**: Dev environment uses custom `Dockerfile.clsi-dev` with TexLive installed directly (non-sandboxed). Must build the image first: `docker build -f develop/Dockerfile.clsi-dev -t develop-clsi .`
 
 ## API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| POST | `/chat/ask` | RAG Q&A with document context |
 | POST | `/evidence/search` | Search evidence |
 | POST | `/documents/parse` | Parse PDF (SOLAR API) |
 | POST | `/documents/index` | Index to FAISS |
