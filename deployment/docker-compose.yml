@@ -119,7 +119,7 @@ services:
       - ../scripts/setup-demo.sh:/setup-demo.sh:ro
       - ../fixtures/latex:/fixtures/latex:ro
       - /var/run/docker.sock:/var/run/docker.sock
-    entrypoint: ["/bin/sh", "-c", "chmod +x /setup-demo.sh && /setup-demo.sh"]
+    entrypoint: ["/bin/sh", "/setup-demo.sh"]
     environment:
       CONTAINER_NAME: overleaf-web
     networks:
